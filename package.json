@@ -1,30 +1,34 @@
 {
   "name": "dexcom-mcp-server",
   "version": "1.0.0",
-  "description": "mcp connection to dexcom device  foy type 1 diabetics or anyone wearing a dexcom cgm",
-  "main": "index.js",
+  "description": "MCP server for Dexcom CGM - assistive intelligence for Type 1 diabetics",
+  "type": "module",
+  "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cykj40/dexcom-mcp-server.git"
   },
-  "keywords": [],
+  "keywords": ["dexcom", "cgm", "diabetes", "mcp", "glucose-monitoring"],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "bugs": {
     "url": "https://github.com/cykj40/dexcom-mcp-server/issues"
   },
   "homepage": "https://github.com/cykj40/dexcom-mcp-server#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.3",
+    "better-sqlite3": "^11.7.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^25.1.0",
-    "ts-node": "^10.9.2",
+    "tsx": "^4.19.2",
     "typescript": "^5.9.3"
   }
 }
