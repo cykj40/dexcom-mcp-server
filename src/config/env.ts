@@ -34,8 +34,8 @@ function validateEnv() {
   } catch (error) {
     if (error instanceof z.ZodError) {
       console.error('❌ Environment validation failed:');
-      error.errors.forEach((err) => {
-        console.error(`  - ${err.path.join('.')}: ${err.message}`);
+      error.issues.forEach((issue) => {
+        console.error(`  - ${issue.path.join('.')}: ${issue.message}`);
       });
       console.error('\nPlease check your .env file or environment variables.');
       process.exit(1);

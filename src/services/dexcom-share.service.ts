@@ -132,11 +132,11 @@ export async function fetchShareReadings(
         return [];
       }
 
-      const retryData = await retryResponse.json();
+      const retryData = await retryResponse.json() as DexcomShareReading[];
       return processShareReadings(retryData);
     }
 
-    const data = await response.json();
+    const data = await response.json() as DexcomShareReading[];
     return processShareReadings(data);
   } catch (error) {
     console.warn('Share API fetch error (non-fatal):', error);
