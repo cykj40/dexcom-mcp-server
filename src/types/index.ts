@@ -132,8 +132,9 @@ export type VegaLiteSpec = Record<string, unknown> & {
   $schema?: string;
   description?: string;
   data: unknown;
-  mark: unknown;
+  mark?: unknown;
   encoding?: unknown;
+  layer?: unknown;
 };
 
 // ============================================================================

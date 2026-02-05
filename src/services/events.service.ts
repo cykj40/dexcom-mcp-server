@@ -3,11 +3,14 @@ import {
   insertInsulinEvent,
   insertCarbEvent,
   insertExerciseEvent,
-  getInsulinEvents,
-  getCarbEvents,
-  getExerciseEvents,
+  getInsulinEvents as dbGetInsulinEvents,
+  getCarbEvents as dbGetCarbEvents,
+  getExerciseEvents as dbGetExerciseEvents,
 } from '../db/queries.js';
 import { getReadingsInRange } from '../db/queries.js';
+
+// Re-export query functions
+export { dbGetInsulinEvents as getInsulinEvents, dbGetCarbEvents as getCarbEvents, dbGetExerciseEvents as getExerciseEvents };
 
 /**
  * Events Service
@@ -51,9 +54,9 @@ export function getEventsAround(
   const startTime = new Date(centerTime.getTime() - windowMinutes * 60 * 1000);
   const endTime = new Date(centerTime.getTime() + windowMinutes * 60 * 1000);
 
-  const insulin = getInsulinEvents(startTime.toISOString(), endTime.toISOString());
-  const carbs = getCarbEvents(startTime.toISOString(), endTime.toISOString());
-  const exercise = getExerciseEvents(startTime.toISOString(), endTime.toISOString());
+  const insulin = dbGetInsulinEvents(startTime.toISOString(), endTime.toISOString());
+  const carbs = dbGetCarbEvents(startTime.toISOString(), endTime.toISOString());
+  const exercise = dbGetExerciseEvents(startTime.toISOString(), endTime.toISOString());
 
   return { insulin, carbs, exercise };
 }
@@ -67,9 +70,9 @@ export function getEventTimeline(
   endDate: string,
   includeGlucoseContext: boolean = true
 ): EventTimeline[] {
-  const insulin = getInsulinEvents(startDate, endDate);
-  const carbs = getCarbEvents(startDate, endDate);
-  const exercise = getExerciseEvents(startDate, endDate);
+  const insulin = dbGetInsulinEvents(startDate, endDate);
+  const carbs = dbGetCarbEvents(startDate, endDate);
+  const exercise = dbGetExerciseEvents(startDate, endDate);
 
   const timeline: EventTimeline[] = [];
 
@@ -143,11 +146,11 @@ export function getEventsByType(
 ): InsulinEvent[] | CarbEvent[] | ExerciseEvent[] {
   switch (eventType) {
     case 'insulin':
-      return getInsulinEvents(startDate, endDate);
+      return dbGetInsulinEvents(startDate, endDate);
     case 'carbs':
-      return getCarbEvents(startDate, endDate);
+      return dbGetCarbEvents(startDate, endDate);
     case 'exercise':
-      return getExerciseEvents(startDate, endDate);
+      return dbGetExerciseEvents(startDate, endDate);
   }
 }
 
@@ -161,9 +164,9 @@ export function getEventsSummary(startDate: string, endDate: string): {
   insulinByType: Record<string, number>;
   exerciseByIntensity: Record<string, number>;
 } {
-  const insulin = getInsulinEvents(startDate, endDate);
-  const carbs = getCarbEvents(startDate, endDate);
-  const exercise = getExerciseEvents(startDate, endDate);
+  const insulin = dbGetInsulinEvents(startDate, endDate);
+  const carbs = dbGetCarbEvents(startDate, endDate);
+  const exercise = dbGetExerciseEvents(startDate, endDate);
 
   const totalInsulin = insulin.reduce((sum, event) => sum + event.units, 0);
   const totalCarbs = carbs.reduce((sum, event) => sum + event.grams, 0);

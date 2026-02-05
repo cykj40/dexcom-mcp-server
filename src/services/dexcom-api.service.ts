@@ -47,7 +47,7 @@ async function makeApiRequest<T>(endpoint: string, options: RequestInit = {}): P
       throw new Error(`Dexcom API error after refresh: ${retryResponse.status} ${retryResponse.statusText}`);
     }
 
-    return retryResponse.json();
+    return retryResponse.json() as Promise<T>;
   }
 
   // Handle 429 - rate limit
@@ -71,7 +71,7 @@ async function makeApiRequest<T>(endpoint: string, options: RequestInit = {}): P
       throw new Error(`Dexcom API error after rate limit: ${retryResponse.status} ${retryResponse.statusText}`);
     }
 
-    return retryResponse.json();
+    return retryResponse.json() as Promise<T>;
   }
 
   if (!response.ok) {
@@ -79,7 +79,7 @@ async function makeApiRequest<T>(endpoint: string, options: RequestInit = {}): P
     throw new Error(`Dexcom API error: ${response.status} ${response.statusText} - ${errorBody}`);
   }
 
-  return response.json();
+  return response.json() as Promise<T>;
 }
 
 /**
@@ -103,7 +103,7 @@ async function refreshAccessToken(): Promise<void> {
     throw new Error(`Failed to refresh token: ${response.status} ${response.statusText}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as { access_token: string; refresh_token: string };
   accessToken = data.access_token;
   refreshToken = data.refresh_token;
 
