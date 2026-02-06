@@ -7,13 +7,21 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "oauth": "tsx src/oauth-helper.ts",
+    "oauth:manual": "tsx src/manual-oauth.ts"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cykj40/dexcom-mcp-server.git"
   },
-  "keywords": ["dexcom", "cgm", "diabetes", "mcp", "glucose-monitoring"],
+  "keywords": [
+    "dexcom",
+    "cgm",
+    "diabetes",
+    "mcp",
+    "glucose-monitoring"
+  ],
   "author": "",
   "license": "ISC",
   "bugs": {
@@ -23,6 +31,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.3",
     "better-sqlite3": "^11.7.0",
+    "openid-client": "^6.8.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
