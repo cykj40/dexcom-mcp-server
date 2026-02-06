@@ -12,19 +12,25 @@ import { getLatestShareReading } from './dexcom-share.service.js';
 /**
  * Get the latest glucose reading
  * Try Dexcom API first, fall back to Share, then fall back to DB
+ *
+ * NOTE: The Dexcom V3 API has a data delay (~1 hour US, ~3 hours international).
+ * We look back 4 hours to account for this delay.
  */
 export async function getLatestReading(): Promise<GlucoseReading | null> {
-  // Try getting from API first (last 15 minutes)
+  // Try getting from API first (last 4 hours to account for Dexcom data delay)
   try {
     const now = new Date();
-    const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+    const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
 
-    const apiReadings = await fetchEGVs(fifteenMinutesAgo.toISOString(), now.toISOString());
+    console.error(`Fetching EGVs from ${fourHoursAgo.toISOString()} to ${now.toISOString()}`);
+    const apiReadings = await fetchEGVs(fourHoursAgo.toISOString(), now.toISOString());
     if (apiReadings.length > 0) {
+      // Return the most recent reading
       return apiReadings[apiReadings.length - 1];
     }
+    console.error('API returned 0 readings in the last 4 hours');
   } catch (error) {
-    console.warn('Failed to fetch latest from API, trying Share...', error);
+    console.error('Failed to fetch latest from API, trying Share...', error);
   }
 
   // Try Share API

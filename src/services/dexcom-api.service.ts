@@ -19,6 +19,8 @@ const BASE_URL = getDexcomApiBaseUrl();
 async function makeApiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE_URL}${endpoint}`;
 
+  console.error(`[Dexcom API] ${options.method || 'GET'} ${url}`);
+
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -28,9 +30,11 @@ async function makeApiRequest<T>(endpoint: string, options: RequestInit = {}): P
     },
   });
 
+  console.error(`[Dexcom API] Response: ${response.status} ${response.statusText}`);
+
   // Handle 401 - token expired, try to refresh
   if (response.status === 401) {
-    console.warn('Access token expired, attempting refresh...');
+    console.error('[Dexcom API] Access token expired, attempting refresh...');
     await refreshAccessToken();
 
     // Retry once with new token
@@ -100,7 +104,10 @@ async function refreshAccessToken(): Promise<void> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to refresh token: ${response.status} ${response.statusText}`);
+    const errorBody = await response.text();
+    console.error(`[Dexcom API] Token refresh failed: ${response.status} ${response.statusText}`);
+    console.error(`[Dexcom API] Refresh error body: ${errorBody}`);
+    throw new Error(`Failed to refresh token: ${response.status} ${response.statusText} - ${errorBody}`);
   }
 
   const data = await response.json() as { access_token: string; refresh_token: string };
@@ -108,7 +115,7 @@ async function refreshAccessToken(): Promise<void> {
   refreshToken = data.refresh_token;
 
   console.error('✅ Access token refreshed successfully');
-  console.error('⚠️  Update your .env file with new tokens:');
+  console.error('⚠️  Note: Tokens are updated in memory. Update your .env for persistence:');
   console.error(`DEXCOM_ACCESS_TOKEN=${accessToken}`);
   console.error(`DEXCOM_REFRESH_TOKEN=${refreshToken}`);
 }
