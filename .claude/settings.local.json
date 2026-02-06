@@ -13,7 +13,8 @@
       "Bash(taskkill //F //PID 20536)",
       "Bash(npm run oauth:manual:*)",
       "Bash(taskkill //F //PID 29132)",
-      "Bash(taskkill //F //PID 30384)"
+      "Bash(taskkill //F //PID 30384)",
+      "Bash(npm rebuild:*)"
     ],
     "deny": [],
     "ask": []
