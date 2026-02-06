@@ -107,10 +107,10 @@ async function refreshAccessToken(): Promise<void> {
   accessToken = data.access_token;
   refreshToken = data.refresh_token;
 
-  console.log('✅ Access token refreshed successfully');
-  console.log('⚠️  Update your .env file with new tokens:');
-  console.log(`DEXCOM_ACCESS_TOKEN=${accessToken}`);
-  console.log(`DEXCOM_REFRESH_TOKEN=${refreshToken}`);
+  console.error('✅ Access token refreshed successfully');
+  console.error('⚠️  Update your .env file with new tokens:');
+  console.error(`DEXCOM_ACCESS_TOKEN=${accessToken}`);
+  console.error(`DEXCOM_REFRESH_TOKEN=${refreshToken}`);
 }
 
 /**
@@ -154,7 +154,7 @@ export async function fetchEGVs(startDate: string, endDate: string): Promise<Glu
       insertGlucoseReading(reading);
     }
 
-    console.log(`✅ Fetched ${readings.length} EGVs from Dexcom API`);
+    console.error(`✅ Fetched ${readings.length} EGVs from Dexcom API`);
     return readings;
   } catch (error) {
     console.error('Error fetching EGVs from Dexcom API:', error);

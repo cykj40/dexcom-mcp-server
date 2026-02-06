@@ -59,7 +59,7 @@ async function authenticate(): Promise<boolean> {
     const data = await response.text();
     // Remove surrounding quotes if present
     sessionId = data.replace(/^"(.*)"$/, '$1');
-    console.log('✅ Share API authenticated');
+    console.error('✅ Share API authenticated');
     return true;
   } catch (error) {
     console.warn('Share API authentication error:', error);
@@ -180,7 +180,7 @@ function processShareReadings(data: DexcomShareReading[]): GlucoseReading[] {
     }
   }
 
-  console.log(`✅ Fetched ${readings.length} readings from Share API`);
+  console.error(`✅ Fetched ${readings.length} readings from Share API`);
   return readings;
 }
 

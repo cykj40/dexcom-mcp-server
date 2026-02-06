@@ -7,7 +7,7 @@ import { getDb } from './database.js';
 export function runMigrations(): void {
   const db = getDb();
 
-  console.log('Running database migrations...');
+  console.error('Running database migrations...');
 
   // Glucose readings table
   db.exec(`
@@ -104,5 +104,5 @@ export function runMigrations(): void {
     ON adaptive_observations(timestamp);
   `);
 
-  console.log('✅ Migrations completed');
+  console.error('✅ Migrations completed');
 }
