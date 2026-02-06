@@ -1,5 +1,9 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
+  ListToolsRequestSchema,
+  CallToolRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
+import {
   getLatestGlucoseTool,
   getLatestGlucoseHandler,
   getGlucoseRangeTool,
@@ -50,7 +54,7 @@ export function registerAllTools(server: Server): void {
   // Glucose Tools
   // ============================================================================
 
-  server.setRequestHandler({ method: 'tools/list' } as any, async () => ({
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: [
       {
         name: getLatestGlucoseTool.name,
@@ -376,7 +380,7 @@ export function registerAllTools(server: Server): void {
   // Tool Call Handlers
   // ============================================================================
 
-  server.setRequestHandler({ method: 'tools/call' } as any, async (request: any) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
     switch (name) {
