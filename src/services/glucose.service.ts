@@ -87,7 +87,7 @@ export async function getReadings(startDate: string, endDate: string): Promise<G
   if (!hasEnoughData) {
     // Try to backfill from API
     try {
-      console.log('Backfilling data from API...');
+      console.error('Backfilling data from API...');
       await fetchEGVs(startDate, endDate);
       return getReadingsInRange(startDate, endDate);
     } catch (error) {

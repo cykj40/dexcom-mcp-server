@@ -17,7 +17,7 @@ export function getDb(): Database.Database {
     // Enable foreign key constraints
     db.pragma('foreign_keys = ON');
 
-    console.log(`✅ Database connected: ${env.DB_PATH}`);
+    console.error(`✅ Database connected: ${env.DB_PATH}`);
   }
 
   return db;
@@ -31,6 +31,6 @@ export function closeDb(): void {
   if (db) {
     db.close();
     db = null;
-    console.log('Database connection closed');
+    console.error('Database connection closed');
   }
 }

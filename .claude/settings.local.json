@@ -14,7 +14,9 @@
       "Bash(npm run oauth:manual:*)",
       "Bash(taskkill //F //PID 29132)",
       "Bash(taskkill //F //PID 30384)",
-      "Bash(npm rebuild:*)"
+      "Bash(npm rebuild:*)",
+      "Bash(node --version:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

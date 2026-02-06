@@ -50,7 +50,7 @@ export function registerAllTools(server: Server): void {
   // Glucose Tools
   // ============================================================================
 
-  server.setRequestHandler('tools/list' as any, async () => ({
+  server.setRequestHandler({ method: 'tools/list' } as any, async () => ({
     tools: [
       {
         name: getLatestGlucoseTool.name,
@@ -376,7 +376,7 @@ export function registerAllTools(server: Server): void {
   // Tool Call Handlers
   // ============================================================================
 
-  server.setRequestHandler('tools/call' as any, async (request: any) => {
+  server.setRequestHandler({ method: 'tools/call' } as any, async (request: any) => {
     const { name, arguments: args } = request.params;
 
     switch (name) {
@@ -425,5 +425,5 @@ export function registerAllTools(server: Server): void {
     }
   });
 
-  console.log('✅ All tools registered');
+  console.error('✅ All tools registered');
 }
