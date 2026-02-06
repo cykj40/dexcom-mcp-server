@@ -14,6 +14,17 @@ let refreshToken = env.DEXCOM_REFRESH_TOKEN;
 const BASE_URL = getDexcomApiBaseUrl();
 
 /**
+ * Format a date string for the Dexcom API.
+ * Dexcom requires: YYYY-MM-DDThh:mm:ss (no milliseconds, no timezone suffix).
+ * Accepts ISO 8601 strings or Date-compatible strings.
+ */
+function formatDexcomDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/**
  * Make an authenticated API request to Dexcom
  */
 async function makeApiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -140,7 +151,9 @@ export function getCurrentRefreshToken(): string {
  */
 export async function fetchEGVs(startDate: string, endDate: string): Promise<GlucoseReading[]> {
   try {
-    const endpoint = `/v3/users/self/egvs?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+    const formattedStart = formatDexcomDate(startDate);
+    const formattedEnd = formatDexcomDate(endDate);
+    const endpoint = `/v3/users/self/egvs?startDate=${encodeURIComponent(formattedStart)}&endDate=${encodeURIComponent(formattedEnd)}`;
     const response = await makeApiRequest<{ records?: DexcomEGV[]; egvs?: DexcomEGV[] }>(endpoint);
 
     // API may return 'records' or 'egvs' depending on version
@@ -188,7 +201,9 @@ export async function getDevices(): Promise<DexcomDevice[]> {
  * Get alerts within date range
  */
 export async function getAlerts(startDate: string, endDate: string): Promise<unknown[]> {
-  const endpoint = `/v3/users/self/alerts?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+  const formattedStart = formatDexcomDate(startDate);
+  const formattedEnd = formatDexcomDate(endDate);
+  const endpoint = `/v3/users/self/alerts?startDate=${encodeURIComponent(formattedStart)}&endDate=${encodeURIComponent(formattedEnd)}`;
   const response = await makeApiRequest<{ records?: unknown[] }>(endpoint);
   return response.records || [];
 }
@@ -197,7 +212,9 @@ export async function getAlerts(startDate: string, endDate: string): Promise<unk
  * Get calibrations within date range
  */
 export async function getCalibrations(startDate: string, endDate: string): Promise<unknown[]> {
-  const endpoint = `/v3/users/self/calibrations?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+  const formattedStart = formatDexcomDate(startDate);
+  const formattedEnd = formatDexcomDate(endDate);
+  const endpoint = `/v3/users/self/calibrations?startDate=${encodeURIComponent(formattedStart)}&endDate=${encodeURIComponent(formattedEnd)}`;
   const response = await makeApiRequest<{ records?: unknown[] }>(endpoint);
   return response.records || [];
 }
