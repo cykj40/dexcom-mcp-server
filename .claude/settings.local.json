@@ -16,7 +16,10 @@
       "Bash(taskkill //F //PID 30384)",
       "Bash(npm rebuild:*)",
       "Bash(node --version:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(npx tsx:*)",
+      "Bash(sqlite3:*)",
+      "Bash(del:*)"
     ],
     "deny": [],
     "ask": []
