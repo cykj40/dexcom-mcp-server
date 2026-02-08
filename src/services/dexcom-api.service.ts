@@ -10,8 +10,45 @@ import { insertGlucoseReading } from '../db/queries.js';
 
 let accessToken = env.DEXCOM_ACCESS_TOKEN;
 let refreshToken = env.DEXCOM_REFRESH_TOKEN;
+let tokenExpiresAt: Date | null = null;
 
 const BASE_URL = getDexcomApiBaseUrl();
+
+/**
+ * Parse JWT token and extract expiration time
+ */
+function getTokenExpiration(token: string): Date | null {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+    if (payload.exp) {
+      return new Date(payload.exp * 1000);
+    }
+  } catch (error) {
+    console.error('[Dexcom API] Failed to parse token expiration:', error);
+  }
+  return null;
+}
+
+/**
+ * Check if token is expired or will expire within the next 5 minutes
+ */
+function isTokenExpiringSoon(): boolean {
+  if (!tokenExpiresAt) {
+    tokenExpiresAt = getTokenExpiration(accessToken);
+  }
+
+  if (!tokenExpiresAt) {
+    // If we can't determine expiration, assume it might be expired
+    return true;
+  }
+
+  // Check if token expires within 5 minutes
+  const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+  return tokenExpiresAt <= fiveMinutesFromNow;
+}
+
+// Initialize token expiration on startup
+tokenExpiresAt = getTokenExpiration(accessToken);
 
 /**
  * Format a date string for the Dexcom API.
@@ -28,6 +65,16 @@ function formatDexcomDate(dateStr: string): string {
  * Make an authenticated API request to Dexcom
  */
 async function makeApiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  // Proactively refresh token if it's expiring soon
+  if (isTokenExpiringSoon()) {
+    console.error('[Dexcom API] Token expiring soon, proactively refreshing...');
+    try {
+      await refreshAccessToken();
+    } catch (error) {
+      console.error('[Dexcom API] Proactive refresh failed, will retry on 401:', error);
+    }
+  }
+
   const url = `${BASE_URL}${endpoint}`;
 
   console.error(`[Dexcom API] ${options.method || 'GET'} ${url}`);
@@ -125,7 +172,13 @@ async function refreshAccessToken(): Promise<void> {
   accessToken = data.access_token;
   refreshToken = data.refresh_token;
 
+  // Update token expiration
+  tokenExpiresAt = getTokenExpiration(accessToken);
+
   console.error('✅ Access token refreshed successfully');
+  if (tokenExpiresAt) {
+    console.error(`   New token expires at: ${tokenExpiresAt.toISOString()}`);
+  }
   console.error('⚠️  Note: Tokens are updated in memory. Update your .env for persistence:');
   console.error(`DEXCOM_ACCESS_TOKEN=${accessToken}`);
   console.error(`DEXCOM_REFRESH_TOKEN=${refreshToken}`);
@@ -169,12 +222,22 @@ export async function fetchEGVs(startDate: string, endDate: string): Promise<Glu
       displayTime: egv.displayTime,
     }));
 
+    // Sort readings by timestamp (oldest to newest)
+    readings.sort((a, b) =>
+      new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime()
+    );
+
     // Store in database
     for (const reading of readings) {
       insertGlucoseReading(reading);
     }
 
     console.error(`✅ Fetched ${readings.length} EGVs from Dexcom API`);
+    if (readings.length > 0) {
+      const oldest = new Date(readings[0].recordedAt).toISOString();
+      const newest = new Date(readings[readings.length - 1].recordedAt).toISOString();
+      console.error(`   Range: ${oldest} to ${newest}`);
+    }
     return readings;
   } catch (error) {
     console.error('Error fetching EGVs from Dexcom API:', error);

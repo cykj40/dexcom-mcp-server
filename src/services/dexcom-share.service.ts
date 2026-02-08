@@ -168,6 +168,11 @@ function processShareReadings(data: DexcomShareReading[]): GlucoseReading[] {
     };
   });
 
+  // Sort readings by timestamp (newest first, as Share API returns them in reverse order)
+  readings.sort((a, b) =>
+    new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()
+  );
+
   // Store in database
   for (const reading of readings) {
     try {
@@ -181,6 +186,10 @@ function processShareReadings(data: DexcomShareReading[]): GlucoseReading[] {
   }
 
   console.error(`✅ Fetched ${readings.length} readings from Share API`);
+  if (readings.length > 0) {
+    const newest = new Date(readings[0].recordedAt).toISOString();
+    console.error(`   Latest: ${newest} (${readings[0].value} mg/dL)`);
+  }
   return readings;
 }
 

@@ -11,39 +11,77 @@ import { getLatestShareReading } from './dexcom-share.service.js';
 
 /**
  * Get the latest glucose reading
- * Try Dexcom API first, fall back to Share, then fall back to DB
+ * Try both Dexcom API and Share, return the freshest data
  *
  * NOTE: The Dexcom V3 API has a data delay (~1 hour US, ~3 hours international).
- * We look back 4 hours to account for this delay.
+ * Share API typically has more recent data, so we try both and compare timestamps.
  */
 export async function getLatestReading(): Promise<GlucoseReading | null> {
+  let apiReading: GlucoseReading | null = null;
+  let shareReading: GlucoseReading | null = null;
+
   // Try getting from API first (last 4 hours to account for Dexcom data delay)
   try {
     const now = new Date();
     const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
 
-    console.error(`Fetching EGVs from ${fourHoursAgo.toISOString()} to ${now.toISOString()}`);
+    console.error(`[API] Fetching EGVs from ${fourHoursAgo.toISOString()} to ${now.toISOString()}`);
     const apiReadings = await fetchEGVs(fourHoursAgo.toISOString(), now.toISOString());
+
     if (apiReadings.length > 0) {
-      // Return the most recent reading
-      return apiReadings[apiReadings.length - 1];
+      // Sort by timestamp to ensure we get the most recent
+      apiReadings.sort((a, b) =>
+        new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()
+      );
+      apiReading = apiReadings[0];
+
+      const ageMinutes = Math.floor((Date.now() - new Date(apiReading.recordedAt).getTime()) / 1000 / 60);
+      console.error(`[API] Latest reading is ${ageMinutes} minutes old (${apiReading.recordedAt})`);
+    } else {
+      console.error('[API] Returned 0 readings in the last 4 hours');
     }
-    console.error('API returned 0 readings in the last 4 hours');
   } catch (error) {
-    console.error('Failed to fetch latest from API, trying Share...', error);
+    console.error('[API] Failed to fetch:', error);
   }
 
-  // Try Share API
+  // Always try Share API for comparison (it's often more current)
   try {
-    const shareReading = await getLatestShareReading();
+    shareReading = await getLatestShareReading();
     if (shareReading) {
-      return shareReading;
+      const ageMinutes = Math.floor((Date.now() - new Date(shareReading.recordedAt).getTime()) / 1000 / 60);
+      console.error(`[Share] Latest reading is ${ageMinutes} minutes old (${shareReading.recordedAt})`);
     }
   } catch (error) {
-    console.warn('Failed to fetch from Share API, using DB...', error);
+    console.error('[Share] Failed to fetch:', error);
+  }
+
+  // Return whichever is more recent
+  if (apiReading && shareReading) {
+    const apiTime = new Date(apiReading.recordedAt).getTime();
+    const shareTime = new Date(shareReading.recordedAt).getTime();
+
+    if (shareTime > apiTime) {
+      console.error(`✅ Using Share reading (${Math.floor((shareTime - apiTime) / 1000 / 60)} minutes newer)`);
+      return shareReading;
+    } else {
+      console.error(`✅ Using API reading (${Math.floor((apiTime - shareTime) / 1000 / 60)} minutes newer)`);
+      return apiReading;
+    }
+  }
+
+  // Return whichever one we got
+  if (shareReading) {
+    console.error('✅ Using Share reading (API had no data)');
+    return shareReading;
+  }
+
+  if (apiReading) {
+    console.error('✅ Using API reading (Share had no data)');
+    return apiReading;
   }
 
   // Fall back to database
+  console.error('[DB] Falling back to database');
   return getLatestFromDb();
 }
 
