@@ -30,6 +30,12 @@ import {
   logExerciseHandler,
   getEventTimelineTool,
   getEventTimelineHandler,
+  getInsulinEventsTool,
+  getInsulinEventsHandler,
+  getCarbEventsTool,
+  getCarbEventsHandler,
+  getExerciseEventsTool,
+  getExerciseEventsHandler,
 } from './event-tools.js';
 import {
   generateChartTool,
@@ -282,6 +288,60 @@ export function registerAllTools(server: Server): void {
           required: ['start_time', 'end_time'],
         },
       },
+      {
+        name: getInsulinEventsTool.name,
+        description: getInsulinEventsTool.description,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            start_time: {
+              type: 'string',
+              description: 'Start time in ISO 8601 format',
+            },
+            end_time: {
+              type: 'string',
+              description: 'End time in ISO 8601 format',
+            },
+          },
+          required: ['start_time', 'end_time'],
+        },
+      },
+      {
+        name: getCarbEventsTool.name,
+        description: getCarbEventsTool.description,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            start_time: {
+              type: 'string',
+              description: 'Start time in ISO 8601 format',
+            },
+            end_time: {
+              type: 'string',
+              description: 'End time in ISO 8601 format',
+            },
+          },
+          required: ['start_time', 'end_time'],
+        },
+      },
+      {
+        name: getExerciseEventsTool.name,
+        description: getExerciseEventsTool.description,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            start_time: {
+              type: 'string',
+              description: 'Start time in ISO 8601 format',
+            },
+            end_time: {
+              type: 'string',
+              description: 'End time in ISO 8601 format',
+            },
+          },
+          required: ['start_time', 'end_time'],
+        },
+      },
       // ============================================================================
       // Chart Tools
       // ============================================================================
@@ -411,6 +471,12 @@ export function registerAllTools(server: Server): void {
         return await logExerciseHandler(args as any);
       case getEventTimelineTool.name:
         return await getEventTimelineHandler(args as any);
+      case getInsulinEventsTool.name:
+        return await getInsulinEventsHandler(args as any);
+      case getCarbEventsTool.name:
+        return await getCarbEventsHandler(args as any);
+      case getExerciseEventsTool.name:
+        return await getExerciseEventsHandler(args as any);
 
       // Chart Tools
       case generateChartTool.name:

@@ -1,5 +1,14 @@
 import { z } from 'zod';
-import { logInsulin, logCarbs, logExercise, getEventTimeline, getEventsSummary } from '../services/events.service.js';
+import {
+  logInsulin,
+  logCarbs,
+  logExercise,
+  getEventTimeline,
+  getEventsSummary,
+  getInsulinEvents,
+  getCarbEvents,
+  getExerciseEvents,
+} from '../services/events.service.js';
 
 /**
  * Event MCP Tools
@@ -274,6 +283,186 @@ export async function getEventTimelineHandler(args: {
         {
           type: 'text',
           text: `Error fetching event timeline: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
+// ============================================================================
+// Tool: get_insulin_events
+// ============================================================================
+
+export const getInsulinEventsTool = {
+  name: 'get_insulin_events',
+  description: 'Get all insulin events within a date range',
+  inputSchema: z.object({
+    start_time: z.string().describe('Start time in ISO 8601 format'),
+    end_time: z.string().describe('End time in ISO 8601 format'),
+  }).strict(),
+};
+
+export async function getInsulinEventsHandler(args: {
+  start_time: string;
+  end_time: string;
+}) {
+  try {
+    const events = getInsulinEvents(args.start_time, args.end_time);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              period: {
+                start: args.start_time,
+                end: args.end_time,
+              },
+              count: events.length,
+              totalUnits: events.reduce((sum, e) => sum + e.units, 0).toFixed(1),
+              events: events.map((event) => ({
+                id: event.id,
+                units: event.units,
+                type: event.type,
+                timestamp: event.timestamp,
+                notes: event.notes,
+              })),
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Error fetching insulin events: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
+// ============================================================================
+// Tool: get_carb_events
+// ============================================================================
+
+export const getCarbEventsTool = {
+  name: 'get_carb_events',
+  description: 'Get all carbohydrate intake events within a date range',
+  inputSchema: z.object({
+    start_time: z.string().describe('Start time in ISO 8601 format'),
+    end_time: z.string().describe('End time in ISO 8601 format'),
+  }).strict(),
+};
+
+export async function getCarbEventsHandler(args: {
+  start_time: string;
+  end_time: string;
+}) {
+  try {
+    const events = getCarbEvents(args.start_time, args.end_time);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              period: {
+                start: args.start_time,
+                end: args.end_time,
+              },
+              count: events.length,
+              totalGrams: events.reduce((sum, e) => sum + e.grams, 0),
+              events: events.map((event) => ({
+                id: event.id,
+                grams: event.grams,
+                foodDescription: event.foodDescription,
+                estimatedGi: event.estimatedGi,
+                timestamp: event.timestamp,
+                notes: event.notes,
+              })),
+              disclaimer:
+                'These are assistive options based on your personal glucose history. You decide what, when, and how to eat.',
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Error fetching carb events: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
+// ============================================================================
+// Tool: get_exercise_events
+// ============================================================================
+
+export const getExerciseEventsTool = {
+  name: 'get_exercise_events',
+  description: 'Get all exercise/physical activity events within a date range',
+  inputSchema: z.object({
+    start_time: z.string().describe('Start time in ISO 8601 format'),
+    end_time: z.string().describe('End time in ISO 8601 format'),
+  }).strict(),
+};
+
+export async function getExerciseEventsHandler(args: {
+  start_time: string;
+  end_time: string;
+}) {
+  try {
+    const events = getExerciseEvents(args.start_time, args.end_time);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              period: {
+                start: args.start_time,
+                end: args.end_time,
+              },
+              count: events.length,
+              events: events.map((event) => ({
+                id: event.id,
+                activityType: event.activityType,
+                durationMinutes: event.durationMinutes,
+                intensity: event.intensity,
+                timestamp: event.timestamp,
+                notes: event.notes,
+              })),
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Error fetching exercise events: ${error instanceof Error ? error.message : String(error)}`,
         },
       ],
       isError: true,
