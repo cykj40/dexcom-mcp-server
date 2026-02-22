@@ -143,3 +143,31 @@ vite.config.ts.timestamp-*
 
 *.md
 !README.md
+
+# Environment and secrets
+.env
+.env.local
+
+# Database files (CONTAINS SENSITIVE HEALTH DATA)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Test scripts (may contain tokens)
+test-*.ts
+fetch-*.ts
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
