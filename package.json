@@ -9,7 +9,11 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "oauth": "tsx src/oauth-helper.ts",
-    "oauth:manual": "tsx src/manual-oauth.ts"
+    "oauth:manual": "tsx src/manual-oauth.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage"
   },
   "repository": {
     "type": "git",
@@ -38,7 +42,9 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^25.1.0",
+    "@vitest/ui": "^4.0.18",
     "tsx": "^4.19.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }
