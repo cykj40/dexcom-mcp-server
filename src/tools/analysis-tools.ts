@@ -33,7 +33,7 @@ export async function analyzeTrendsHandler(args: { days?: number }) {
 
     // Get glucose readings and events
     const readings = await getReadings(startTime.toISOString(), endTime.toISOString());
-    const timeline = getEventTimeline(startTime.toISOString(), endTime.toISOString(), true);
+    const timeline = await getEventTimeline(startTime.toISOString(), endTime.toISOString(), true);
 
     // Calculate overall statistics
     const stats = calculateStatistics(readings);
@@ -195,7 +195,7 @@ export async function compareExpectedVsActualHandler(args: {
     const endTime = new Date(eventTime.getTime() + windowHours * 60 * 60 * 1000);
 
     // Get actual readings
-    const actualReadings = getReadingsInRange(args.event_timestamp, endTime.toISOString());
+    const actualReadings = await getReadingsInRange(args.event_timestamp, endTime.toISOString());
 
     // Generate prediction
     let prediction;
@@ -215,7 +215,7 @@ export async function compareExpectedVsActualHandler(args: {
     }
 
     // Analyze outcome
-    const outcome = analyzeEventOutcome(
+    const outcome = await analyzeEventOutcome(
       args.event_type,
       args.event_timestamp,
       prediction,
@@ -281,7 +281,7 @@ export const detectParameterDriftTool = {
 export async function detectParameterDriftHandler(args: { days?: number }) {
   try {
     const days = args.days || 14;
-    const driftAnalysis = detectParameterDrift(days);
+    const driftAnalysis = await detectParameterDrift(days);
 
     return {
       content: [

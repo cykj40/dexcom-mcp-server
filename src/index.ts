@@ -6,17 +6,27 @@
  *
  * A human-in-the-loop assistive intelligence system for CGM data analysis
  * Read-only, non-autonomous, user-controlled
+ *
+ * Transport modes:
+ *   TRANSPORT=stdio (default) — Claude Desktop, local use
+ *   TRANSPORT=http            — Remote access via claude.ai
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import express, { type Request, type Response, type NextFunction } from 'express';
+import type { IncomingMessage, ServerResponse } from 'http';
 
 // Initialize environment (validates and crashes if invalid)
 import { env } from './config/env.js';
 
 // Initialize database
-import { getDb, closeDb } from './db/database.js';
+import { closeDb } from './db/database.js';
 import { runMigrations } from './db/migrations.js';
+
+// Load persisted tokens after DB init
+import { initializeTokens } from './services/dexcom-api.service.js';
 
 // Register all tools
 import { registerAllTools } from './tools/index.js';
@@ -25,17 +35,25 @@ import { registerAllTools } from './tools/index.js';
  * Main server initialization
  */
 async function main() {
+  const transport = env.TRANSPORT ?? 'stdio';
+
   console.error('🚀 Starting Dexcom MCP Server...');
-  console.error(`📊 Database: ${env.DB_PATH}`);
+  console.error(`📡 Transport: ${transport}`);
   console.error(`🔐 API Environment: ${env.DEXCOM_API_ENV}`);
 
-  // Initialize database
+  // Initialize database and run migrations
   try {
-    getDb();
-    runMigrations();
+    await runMigrations();
   } catch (error) {
     console.error('❌ Database initialization failed:', error);
     process.exit(1);
+  }
+
+  // Load persisted OAuth tokens from DB (fall back to env vars if not found)
+  try {
+    await initializeTokens();
+  } catch (error) {
+    console.error('⚠️  Token initialization warning (using env vars):', error);
   }
 
   // Create MCP server
@@ -59,33 +77,105 @@ async function main() {
     console.error('❌ Server error:', error);
   };
 
-  // Handle process signals
-  process.on('SIGINT', async () => {
+  // Graceful shutdown handler
+  const shutdown = async () => {
     console.error('\n⏸️  Shutting down gracefully...');
     closeDb();
     await server.close();
     process.exit(0);
-  });
+  };
 
-  process.on('SIGTERM', async () => {
-    console.error('\n⏸️  Shutting down gracefully...');
-    closeDb();
-    await server.close();
-    process.exit(0);
-  });
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 
-  // Connect via stdio transport
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  // ── HTTP transport ──────────────────────────────────────────────────────────
+  if (transport === 'http') {
+    const mcpAuthToken = env.MCP_AUTH_TOKEN;
+    if (!mcpAuthToken) {
+      console.error('❌ MCP_AUTH_TOKEN must be set when TRANSPORT=http');
+      process.exit(1);
+    }
 
-  console.error('✅ Dexcom MCP Server is running');
-  console.error('📡 Listening for MCP requests via stdio...');
-  console.error('');
-  console.error('Prime Directive: Human-in-the-loop assistive intelligence');
-  console.error('  ✓ Claude analyzes, reasons, recommends');
-  console.error('  ✓ User decides and acts');
-  console.error('  ✓ No automation, no control, no silent changes');
-  console.error('');
+    const app = express();
+    app.use(express.json());
+
+    // Bearer token auth middleware for /mcp
+    const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || authHeader !== `Bearer ${mcpAuthToken}`) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      next();
+    };
+
+    // Stateless StreamableHTTP transport (one per server process)
+    const httpTransport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    });
+
+    await server.connect(httpTransport);
+
+    // MCP endpoints
+    app.post(
+      '/mcp',
+      requireAuth,
+      async (req: Request, res: Response) => {
+        await httpTransport.handleRequest(
+          req as unknown as IncomingMessage,
+          res as unknown as ServerResponse,
+          req.body as unknown
+        );
+      }
+    );
+
+    app.get(
+      '/mcp',
+      requireAuth,
+      async (req: Request, res: Response) => {
+        await httpTransport.handleRequest(
+          req as unknown as IncomingMessage,
+          res as unknown as ServerResponse
+        );
+      }
+    );
+
+    app.delete(
+      '/mcp',
+      requireAuth,
+      async (req: Request, res: Response) => {
+        await httpTransport.handleRequest(
+          req as unknown as IncomingMessage,
+          res as unknown as ServerResponse
+        );
+      }
+    );
+
+    // Health check (no auth required)
+    app.get('/health', (_req: Request, res: Response) => {
+      res.json({ status: 'ok', transport: 'http' });
+    });
+
+    const port = parseInt(env.PORT ?? '3000', 10);
+    app.listen(port, () => {
+      console.error(`✅ Dexcom MCP Server running on port ${port}`);
+      console.error(`🌐 MCP endpoint: POST/GET https://<your-app>.fly.dev/mcp`);
+    });
+
+  // ── stdio transport (default — for Claude Desktop) ──────────────────────────
+  } else {
+    const stdioTransport = new StdioServerTransport();
+    await server.connect(stdioTransport);
+
+    console.error('✅ Dexcom MCP Server is running');
+    console.error('📡 Listening for MCP requests via stdio...');
+    console.error('');
+    console.error('Prime Directive: Human-in-the-loop assistive intelligence');
+    console.error('  ✓ Claude analyzes, reasons, recommends');
+    console.error('  ✓ User decides and acts');
+    console.error('  ✓ No automation, no control, no silent changes');
+    console.error('');
+  }
 }
 
 // Run the server

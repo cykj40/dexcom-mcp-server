@@ -44,7 +44,7 @@ export async function logInsulinHandler(args: {
   try {
     const timestamp = args.timestamp || new Date().toISOString();
 
-    const eventId = logInsulin({
+    const eventId = await logInsulin({
       units: args.units,
       type: args.type,
       timestamp,
@@ -114,7 +114,7 @@ export async function logCarbsHandler(args: {
   try {
     const timestamp = args.timestamp || new Date().toISOString();
 
-    const eventId = logCarbs({
+    const eventId = await logCarbs({
       grams: args.grams,
       foodDescription: args.food_description,
       estimatedGi: args.estimated_gi,
@@ -185,7 +185,7 @@ export async function logExerciseHandler(args: {
   try {
     const timestamp = args.timestamp || new Date().toISOString();
 
-    const eventId = logExercise({
+    const eventId = await logExercise({
       activityType: args.activity_type,
       durationMinutes: args.duration_minutes,
       intensity: args.intensity,
@@ -240,8 +240,8 @@ export async function getEventTimelineHandler(args: {
   end_time: string;
 }) {
   try {
-    const timeline = getEventTimeline(args.start_time, args.end_time, true);
-    const summary = getEventsSummary(args.start_time, args.end_time);
+    const timeline = await getEventTimeline(args.start_time, args.end_time, true);
+    const summary = await getEventsSummary(args.start_time, args.end_time);
 
     return {
       content: [
@@ -308,7 +308,7 @@ export async function getInsulinEventsHandler(args: {
   end_time: string;
 }) {
   try {
-    const events = getInsulinEvents(args.start_time, args.end_time);
+    const events = await getInsulinEvents(args.start_time, args.end_time);
 
     return {
       content: [
@@ -367,7 +367,7 @@ export async function getCarbEventsHandler(args: {
   end_time: string;
 }) {
   try {
-    const events = getCarbEvents(args.start_time, args.end_time);
+    const events = await getCarbEvents(args.start_time, args.end_time);
 
     return {
       content: [
@@ -429,7 +429,7 @@ export async function getExerciseEventsHandler(args: {
   end_time: string;
 }) {
   try {
-    const events = getExerciseEvents(args.start_time, args.end_time);
+    const events = await getExerciseEvents(args.start_time, args.end_time);
 
     return {
       content: [
