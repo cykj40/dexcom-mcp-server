@@ -133,7 +133,7 @@ export function compareExpectedVsActual(
  * Detect parameter drift over time
  * Analyzes recent observations for systematic deviations
  */
-export function detectParameterDrift(days: number = 14): {
+export async function detectParameterDrift(days: number = 14): Promise<{
   observations: AdaptiveObservation[];
   driftSummary: {
     isfDrift: number | null;
@@ -141,8 +141,8 @@ export function detectParameterDrift(days: number = 14): {
     patterns: string[];
   };
   recommendation: string;
-} {
-  const observations = getRecentObservations(days);
+}> {
+  const observations = await getRecentObservations(days);
 
   // Group observations by type
   const isfObservations = observations.filter((o) => o.observationType === 'isf_deviation');
@@ -179,7 +179,7 @@ export function detectParameterDrift(days: number = 14): {
     );
   }
 
-  // Check for time-of-day patterns (would need more sophisticated analysis)
+  // Check for time-of-day patterns
   const morningObs = observations.filter((o) => {
     const hour = new Date(o.timestamp).getHours();
     return hour >= 5 && hour < 10;
@@ -227,20 +227,22 @@ export function detectParameterDrift(days: number = 14): {
 /**
  * Record an adaptive observation
  */
-export function recordObservation(obs: AdaptiveObservation): number {
+export async function recordObservation(obs: AdaptiveObservation): Promise<number> {
   return insertAdaptiveObservation(obs);
 }
 
 /**
  * Get recent drift summary
  */
-export function getRecentDrift(days: number = 7): {
+export async function getRecentDrift(days: number = 7): Promise<{
   isfObservations: AdaptiveObservation[];
   icrObservations: AdaptiveObservation[];
   summary: string;
-} {
-  const isfObservations = getObservationsByType('isf_deviation', days);
-  const icrObservations = getObservationsByType('icr_deviation', days);
+}> {
+  const [isfObservations, icrObservations] = await Promise.all([
+    getObservationsByType('isf_deviation', days),
+    getObservationsByType('icr_deviation', days),
+  ]);
 
   let summary = `Analyzed ${isfObservations.length + icrObservations.length} observations from the last ${days} days.\n\n`;
 
@@ -271,12 +273,12 @@ export function getRecentDrift(days: number = 7): {
  * Analyze glucose outcome after an event
  * Helper function to create observations automatically
  */
-export function analyzeEventOutcome(
+export async function analyzeEventOutcome(
   eventType: 'insulin' | 'carbs',
   eventTimestamp: string,
   prediction: GlucosePrediction,
   actualReadings: GlucoseReading[]
-): AdaptiveObservation | null {
+): Promise<AdaptiveObservation | null> {
   const comparison = compareExpectedVsActual(prediction, actualReadings);
 
   // Only record if deviation is significant (>15%)
@@ -303,6 +305,13 @@ export function analyzeEventOutcome(
     timestamp: eventTimestamp,
   };
 
-  const id = recordObservation(observation);
+  const id = await recordObservation(observation);
   return { ...observation, id };
+}
+
+/**
+ * Get readings in range (convenience re-export for tools)
+ */
+export async function getReadingsForRange(startDate: string, endDate: string): Promise<GlucoseReading[]> {
+  return getReadingsInRange(startDate, endDate);
 }

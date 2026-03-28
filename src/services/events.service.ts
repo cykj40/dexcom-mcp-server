@@ -6,10 +6,10 @@ import {
   getInsulinEvents as dbGetInsulinEvents,
   getCarbEvents as dbGetCarbEvents,
   getExerciseEvents as dbGetExerciseEvents,
+  getReadingsInRange,
 } from '../db/queries.js';
-import { getReadingsInRange } from '../db/queries.js';
 
-// Re-export query functions
+// Re-export async query functions for direct use by tools
 export { dbGetInsulinEvents as getInsulinEvents, dbGetCarbEvents as getCarbEvents, dbGetExerciseEvents as getExerciseEvents };
 
 /**
@@ -20,21 +20,21 @@ export { dbGetInsulinEvents as getInsulinEvents, dbGetCarbEvents as getCarbEvent
 /**
  * Log an insulin event
  */
-export function logInsulin(event: InsulinEvent): number {
+export async function logInsulin(event: InsulinEvent): Promise<number> {
   return insertInsulinEvent(event);
 }
 
 /**
  * Log a carb event
  */
-export function logCarbs(event: CarbEvent): number {
+export async function logCarbs(event: CarbEvent): Promise<number> {
   return insertCarbEvent(event);
 }
 
 /**
  * Log an exercise event
  */
-export function logExercise(event: ExerciseEvent): number {
+export async function logExercise(event: ExerciseEvent): Promise<number> {
   return insertExerciseEvent(event);
 }
 
@@ -42,21 +42,23 @@ export function logExercise(event: ExerciseEvent): number {
  * Get all events around a specific timestamp within a time window
  * Useful for correlation analysis
  */
-export function getEventsAround(
+export async function getEventsAround(
   timestamp: string,
   windowMinutes: number = 60
-): {
+): Promise<{
   insulin: InsulinEvent[];
   carbs: CarbEvent[];
   exercise: ExerciseEvent[];
-} {
+}> {
   const centerTime = new Date(timestamp);
   const startTime = new Date(centerTime.getTime() - windowMinutes * 60 * 1000);
   const endTime = new Date(centerTime.getTime() + windowMinutes * 60 * 1000);
 
-  const insulin = dbGetInsulinEvents(startTime.toISOString(), endTime.toISOString());
-  const carbs = dbGetCarbEvents(startTime.toISOString(), endTime.toISOString());
-  const exercise = dbGetExerciseEvents(startTime.toISOString(), endTime.toISOString());
+  const [insulin, carbs, exercise] = await Promise.all([
+    dbGetInsulinEvents(startTime.toISOString(), endTime.toISOString()),
+    dbGetCarbEvents(startTime.toISOString(), endTime.toISOString()),
+    dbGetExerciseEvents(startTime.toISOString(), endTime.toISOString()),
+  ]);
 
   return { insulin, carbs, exercise };
 }
@@ -65,14 +67,16 @@ export function getEventsAround(
  * Get a merged, chronological timeline of all event types
  * Optionally includes glucose context for each event
  */
-export function getEventTimeline(
+export async function getEventTimeline(
   startDate: string,
   endDate: string,
   includeGlucoseContext: boolean = true
-): EventTimeline[] {
-  const insulin = dbGetInsulinEvents(startDate, endDate);
-  const carbs = dbGetCarbEvents(startDate, endDate);
-  const exercise = dbGetExerciseEvents(startDate, endDate);
+): Promise<EventTimeline[]> {
+  const [insulin, carbs, exercise] = await Promise.all([
+    dbGetInsulinEvents(startDate, endDate),
+    dbGetCarbEvents(startDate, endDate),
+    dbGetExerciseEvents(startDate, endDate),
+  ]);
 
   const timeline: EventTimeline[] = [];
 
@@ -108,7 +112,7 @@ export function getEventTimeline(
 
   // Add glucose context if requested
   if (includeGlucoseContext) {
-    const glucoseReadings = getReadingsInRange(startDate, endDate);
+    const glucoseReadings = await getReadingsInRange(startDate, endDate);
 
     for (const event of timeline) {
       // Find the closest glucose reading within 15 minutes
@@ -139,11 +143,11 @@ export function getEventTimeline(
 /**
  * Get events by type within a date range
  */
-export function getEventsByType(
+export async function getEventsByType(
   eventType: 'insulin' | 'carbs' | 'exercise',
   startDate: string,
   endDate: string
-): InsulinEvent[] | CarbEvent[] | ExerciseEvent[] {
+): Promise<InsulinEvent[] | CarbEvent[] | ExerciseEvent[]> {
   switch (eventType) {
     case 'insulin':
       return dbGetInsulinEvents(startDate, endDate);
@@ -157,16 +161,18 @@ export function getEventsByType(
 /**
  * Get summary of events for a date range
  */
-export function getEventsSummary(startDate: string, endDate: string): {
+export async function getEventsSummary(startDate: string, endDate: string): Promise<{
   totalInsulin: number;
   totalCarbs: number;
   totalExercise: number;
   insulinByType: Record<string, number>;
   exerciseByIntensity: Record<string, number>;
-} {
-  const insulin = dbGetInsulinEvents(startDate, endDate);
-  const carbs = dbGetCarbEvents(startDate, endDate);
-  const exercise = dbGetExerciseEvents(startDate, endDate);
+}> {
+  const [insulin, carbs, exercise] = await Promise.all([
+    dbGetInsulinEvents(startDate, endDate),
+    dbGetCarbEvents(startDate, endDate),
+    dbGetExerciseEvents(startDate, endDate),
+  ]);
 
   const totalInsulin = insulin.reduce((sum, event) => sum + event.units, 0);
   const totalCarbs = carbs.reduce((sum, event) => sum + event.grams, 0);

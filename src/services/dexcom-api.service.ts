@@ -2,6 +2,7 @@ import { env, getDexcomApiBaseUrl } from '../config/env.js';
 import type { DexcomEGV, DexcomDataRange, DexcomDevice, GlucoseReading } from '../types/index.js';
 import { TREND_DESCRIPTIONS } from '../types/index.js';
 import { insertGlucoseReading } from '../db/queries.js';
+import { getToken, setToken } from '../db/token-store.js';
 
 /**
  * Dexcom Developer API Service (Primary Data Source)
@@ -15,11 +16,38 @@ let tokenExpiresAt: Date | null = null;
 const BASE_URL = getDexcomApiBaseUrl();
 
 /**
+ * Load persisted tokens from the database, falling back to env vars.
+ * Must be called after the database is initialized.
+ */
+export async function initializeTokens(): Promise<void> {
+  try {
+    const [dbAccess, dbRefresh] = await Promise.all([
+      getToken('access_token'),
+      getToken('refresh_token'),
+    ]);
+
+    if (dbAccess) {
+      accessToken = dbAccess;
+      console.error('[Dexcom API] Loaded access_token from database');
+    }
+    if (dbRefresh) {
+      refreshToken = dbRefresh;
+      console.error('[Dexcom API] Loaded refresh_token from database');
+    }
+  } catch (error) {
+    console.error('[Dexcom API] Could not load tokens from DB, using env vars:', error);
+  }
+
+  tokenExpiresAt = getTokenExpiration(accessToken);
+  console.error(`[Dexcom API] Token initialized, expires: ${tokenExpiresAt?.toISOString() ?? 'unknown'}`);
+}
+
+/**
  * Parse JWT token and extract expiration time
  */
 function getTokenExpiration(token: string): Date | null {
   try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString()) as { exp?: number };
     if (payload.exp) {
       return new Date(payload.exp * 1000);
     }
@@ -46,9 +74,6 @@ function isTokenExpiringSoon(): boolean {
   const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
   return tokenExpiresAt <= fiveMinutesFromNow;
 }
-
-// Initialize token expiration on startup
-tokenExpiresAt = getTokenExpiration(accessToken);
 
 /**
  * Format a date string for the Dexcom API.
@@ -145,7 +170,7 @@ async function makeApiRequest<T>(endpoint: string, options: RequestInit = {}): P
 }
 
 /**
- * Refresh the OAuth access token
+ * Refresh the OAuth access token and persist to database
  */
 async function refreshAccessToken(): Promise<void> {
   const response = await fetch(`${BASE_URL}/v3/oauth2/token`, {
@@ -179,9 +204,21 @@ async function refreshAccessToken(): Promise<void> {
   if (tokenExpiresAt) {
     console.error(`   New token expires at: ${tokenExpiresAt.toISOString()}`);
   }
-  console.error('⚠️  Note: Tokens are updated in memory. Update your .env for persistence:');
-  console.error(`DEXCOM_ACCESS_TOKEN=${accessToken}`);
-  console.error(`DEXCOM_REFRESH_TOKEN=${refreshToken}`);
+
+  // Persist tokens to database so they survive VM restarts
+  try {
+    await Promise.all([
+      setToken('access_token', accessToken),
+      setToken('refresh_token', refreshToken),
+    ]);
+    console.error('✅ Tokens persisted to database');
+  } catch (err) {
+    console.error('[Dexcom API] Failed to persist tokens to DB:', err);
+    // Non-fatal: tokens are still in memory for this session
+    console.error('⚠️  Fallback: update your .env for persistence:');
+    console.error(`DEXCOM_ACCESS_TOKEN=${accessToken}`);
+    console.error(`DEXCOM_REFRESH_TOKEN=${refreshToken}`);
+  }
 }
 
 /**
@@ -229,7 +266,7 @@ export async function fetchEGVs(startDate: string, endDate: string): Promise<Glu
 
     // Store in database
     for (const reading of readings) {
-      insertGlucoseReading(reading);
+      await insertGlucoseReading(reading);
     }
 
     console.error(`✅ Fetched ${readings.length} EGVs from Dexcom API`);

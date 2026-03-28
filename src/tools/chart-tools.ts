@@ -69,7 +69,7 @@ export async function generateChartHandler(args: {
 
         const readings = await getReadings(args.start_date, args.end_date);
         const events = includeEvents
-          ? getEventTimeline(args.start_date, args.end_date, true)
+          ? await getEventTimeline(args.start_date, args.end_date, true)
           : undefined;
 
         const chart = glucoseTimeSeries(readings, events);
@@ -96,7 +96,7 @@ export async function generateChartHandler(args: {
         const date = args.date || new Date().toISOString().split('T')[0];
         const summary = await getDailySummary(date);
         const events = includeEvents
-          ? getEventTimeline(
+          ? await getEventTimeline(
               new Date(date + 'T00:00:00').toISOString(),
               new Date(date + 'T23:59:59').toISOString(),
               true

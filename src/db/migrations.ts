@@ -4,13 +4,13 @@ import { getDb } from './database.js';
  * Run all database migrations
  * Creates tables and indexes on first run
  */
-export function runMigrations(): void {
+export async function runMigrations(): Promise<void> {
   const db = getDb();
 
   console.error('Running database migrations...');
 
   // Glucose readings table
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS glucose_readings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       value INTEGER NOT NULL,
@@ -22,16 +22,16 @@ export function runMigrations(): void {
       display_time TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(recorded_at, source)
-    );
+    )
   `);
 
-  db.exec(`
+  await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_readings_recorded_at
-    ON glucose_readings(recorded_at);
+    ON glucose_readings(recorded_at)
   `);
 
   // Insulin events table
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS insulin_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       units REAL NOT NULL,
@@ -39,16 +39,16 @@ export function runMigrations(): void {
       timestamp TEXT NOT NULL,
       notes TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
+    )
   `);
 
-  db.exec(`
+  await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_insulin_timestamp
-    ON insulin_events(timestamp);
+    ON insulin_events(timestamp)
   `);
 
   // Carb events table
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS carb_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       grams REAL NOT NULL,
@@ -58,16 +58,16 @@ export function runMigrations(): void {
       timestamp TEXT NOT NULL,
       notes TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
+    )
   `);
 
-  db.exec(`
+  await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_carb_timestamp
-    ON carb_events(timestamp);
+    ON carb_events(timestamp)
   `);
 
   // Exercise events table
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS exercise_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       activity_type TEXT NOT NULL,
@@ -76,16 +76,16 @@ export function runMigrations(): void {
       timestamp TEXT NOT NULL,
       notes TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
+    )
   `);
 
-  db.exec(`
+  await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_exercise_timestamp
-    ON exercise_events(timestamp);
+    ON exercise_events(timestamp)
   `);
 
   // Adaptive observations table
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS adaptive_observations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       observation_type TEXT NOT NULL,
@@ -96,12 +96,21 @@ export function runMigrations(): void {
       hypothesis TEXT,
       timestamp TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
+    )
   `);
 
-  db.exec(`
+  await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_observations_timestamp
-    ON adaptive_observations(timestamp);
+    ON adaptive_observations(timestamp)
+  `);
+
+  // Token persistence table (for OAuth tokens across VM restarts)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS tokens (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
   `);
 
   console.error('✅ Migrations completed');

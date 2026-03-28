@@ -17,8 +17,16 @@ const envSchema = z.object({
   DEXCOM_SHARE_USERNAME: z.string().optional(),
   DEXCOM_SHARE_PASSWORD: z.string().optional(),
 
-  // Database
-  DB_PATH: z.string().default('./data/dexcom.db'),
+  // Turso database (required)
+  TURSO_DATABASE_URL: z.string().trim().min(1, 'TURSO_DATABASE_URL is required'),
+  TURSO_AUTH_TOKEN: z.string().optional(),
+
+  // HTTP transport auth (required when TRANSPORT=http)
+  MCP_AUTH_TOKEN: z.string().optional(),
+
+  // Transport mode
+  TRANSPORT: z.enum(['http', 'stdio']).optional(),
+  PORT: z.string().optional(),
 
   // API environment
   DEXCOM_API_ENV: z.enum(['production', 'sandbox']).default('production'),
@@ -46,7 +54,7 @@ function validateEnv() {
 
 /**
  * Validated environment configuration
- * All other files import from here - never access process.env directly
+ * All other files import from here — never access process.env directly
  */
 export const env = validateEnv();
 

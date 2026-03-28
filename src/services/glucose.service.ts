@@ -6,7 +6,7 @@ import { getLatestShareReading } from './dexcom-share.service.js';
 
 /**
  * Glucose Service
- * Aggregation and statistics layer that works with data from SQLite
+ * Aggregation and statistics layer that works with data from Turso
  */
 
 /**
@@ -91,7 +91,7 @@ export async function getLatestReading(): Promise<GlucoseReading | null> {
  */
 export async function getReadings(startDate: string, endDate: string): Promise<GlucoseReading[]> {
   // First, get what's in the database
-  const dbReadings = getReadingsInRange(startDate, endDate);
+  const dbReadings = await getReadingsInRange(startDate, endDate);
 
   // If we have recent data, return it
   const start = new Date(startDate);

@@ -254,8 +254,8 @@ export const getAdaptiveInsightsTool = {
 export async function getAdaptiveInsightsHandler(args: { days?: number }) {
   try {
     const days = args.days || 14;
-    const drift = getRecentDrift(days);
-    const driftAnalysis = detectParameterDrift(days);
+    const drift = await getRecentDrift(days);
+    const driftAnalysis = await detectParameterDrift(days);
 
     return {
       content: [

@@ -4,6 +4,9 @@
   "description": "MCP server for Dexcom CGM - assistive intelligence for Type 1 diabetics",
   "type": "module",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
@@ -33,14 +36,15 @@
   },
   "homepage": "https://github.com/cykj40/dexcom-mcp-server#readme",
   "dependencies": {
+    "@libsql/client": "^0.17.2",
     "@modelcontextprotocol/sdk": "^1.25.3",
-    "better-sqlite3": "^11.10.0",
     "dotenv": "^17.2.4",
+    "express": "^5.2.1",
     "openid-client": "^6.8.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
+    "@types/express": "^5.0.6",
     "@types/node": "^25.1.0",
     "@vitest/ui": "^4.0.18",
     "tsx": "^4.19.2",
