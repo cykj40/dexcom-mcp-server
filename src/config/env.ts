@@ -24,6 +24,10 @@ const envSchema = z.object({
   // HTTP transport auth (required when TRANSPORT=http)
   MCP_AUTH_TOKEN: z.string().optional(),
 
+  // OAuth 2.0 credentials for Claude.ai MCP connector
+  OAUTH_CLIENT_ID: z.string().optional(),
+  OAUTH_CLIENT_SECRET: z.string().optional(),
+
   // Transport mode
   TRANSPORT: z.enum(['http', 'stdio']).optional(),
   PORT: z.string().optional(),

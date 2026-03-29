@@ -99,6 +99,57 @@ async function main() {
     const app = express();
     app.use(express.json());
 
+    // ── OAuth 2.0 endpoints (for Claude.ai MCP connector) ──────────────────────
+    const oauthClientId = env.OAUTH_CLIENT_ID;
+    const oauthClientSecret = env.OAUTH_CLIENT_SECRET;
+
+    // GET /authorize — redirect with auth code
+    app.get('/authorize', (req: Request, res: Response) => {
+      const { response_type, client_id, redirect_uri, state } = req.query as Record<string, string>;
+
+      if (!oauthClientId || client_id !== oauthClientId) {
+        res.status(401).json({ error: 'invalid_client' });
+        return;
+      }
+      if (response_type !== 'code') {
+        res.status(400).json({ error: 'unsupported_response_type' });
+        return;
+      }
+      if (!redirect_uri) {
+        res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri required' });
+        return;
+      }
+
+      const redirectUrl = new URL(redirect_uri);
+      redirectUrl.searchParams.set('code', mcpAuthToken);
+      if (state) redirectUrl.searchParams.set('state', state);
+      res.redirect(redirectUrl.toString());
+    });
+
+    // POST /token — exchange code for access token
+    app.post('/token', (req: Request, res: Response) => {
+      const { grant_type, code, client_id, client_secret } = req.body as Record<string, string>;
+
+      if (!oauthClientId || !oauthClientSecret) {
+        res.status(503).json({ error: 'server_error', error_description: 'OAuth not configured' });
+        return;
+      }
+      if (client_id !== oauthClientId || client_secret !== oauthClientSecret) {
+        res.status(401).json({ error: 'invalid_client' });
+        return;
+      }
+      if (grant_type !== 'authorization_code') {
+        res.status(400).json({ error: 'unsupported_grant_type' });
+        return;
+      }
+      if (code !== mcpAuthToken) {
+        res.status(400).json({ error: 'invalid_grant' });
+        return;
+      }
+
+      res.json({ access_token: mcpAuthToken, token_type: 'bearer' });
+    });
+
     // Bearer token auth middleware for /mcp
     const requireAuth = (req: Request, res: Response, next: NextFunction) => {
       const authHeader = req.headers.authorization;
