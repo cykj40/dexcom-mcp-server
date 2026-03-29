@@ -40,6 +40,18 @@ export async function initializeTokens(): Promise<void> {
 
   tokenExpiresAt = getTokenExpiration(accessToken);
   console.error(`[Dexcom API] Token initialized, expires: ${tokenExpiresAt?.toISOString() ?? 'unknown'}`);
+
+  // Refresh immediately if expired or expiring within 24 hours
+  const twentyFourHoursFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  if (!tokenExpiresAt || tokenExpiresAt <= twentyFourHoursFromNow) {
+    console.error('[Dexcom API] Token expired or expiring within 24h, refreshing on startup...');
+    try {
+      await refreshAccessToken();
+    } catch (error) {
+      console.error('[Dexcom API] Startup token refresh failed:', error);
+      // Non-fatal: server still starts, will retry on first API call
+    }
+  }
 }
 
 /**

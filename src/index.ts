@@ -98,7 +98,7 @@ async function main() {
 
     const app = express();
     app.use(express.json());
-    app.use(express.urlencoded({ extended: false }));
+    app.use(express.urlencoded({ extended: true }));
 
     // ── OAuth 2.0 endpoints (for Claude.ai MCP connector) ──────────────────────
     const oauthClientId = env.OAUTH_CLIENT_ID;
