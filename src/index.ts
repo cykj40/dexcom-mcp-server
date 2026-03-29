@@ -98,10 +98,24 @@ async function main() {
 
     const app = express();
     app.use(express.json());
+    app.use(express.urlencoded({ extended: false }));
 
     // ── OAuth 2.0 endpoints (for Claude.ai MCP connector) ──────────────────────
     const oauthClientId = env.OAUTH_CLIENT_ID;
     const oauthClientSecret = env.OAUTH_CLIENT_SECRET;
+
+    // GET /.well-known/oauth-authorization-server — discovery metadata
+    app.get('/.well-known/oauth-authorization-server', (req: Request, res: Response) => {
+      const base = `https://${req.hostname}`;
+      res.json({
+        issuer: base,
+        authorization_endpoint: `${base}/authorize`,
+        token_endpoint: `${base}/token`,
+        response_types_supported: ['code'],
+        grant_types_supported: ['authorization_code'],
+        token_endpoint_auth_methods_supported: ['client_secret_post'],
+      });
+    });
 
     // GET /authorize — redirect with auth code
     app.get('/authorize', (req: Request, res: Response) => {
@@ -147,7 +161,7 @@ async function main() {
         return;
       }
 
-      res.json({ access_token: mcpAuthToken, token_type: 'bearer' });
+      res.json({ access_token: mcpAuthToken, token_type: 'bearer', expires_in: 3600 });
     });
 
     // Bearer token auth middleware for /mcp
