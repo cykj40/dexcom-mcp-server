@@ -36,16 +36,19 @@ export interface BaselineParameters {
   correctionFactor: number; // ISF: 1u lowers by N mg/dL
   insulinToCarbRatio: number; // ICR: 1u per N g carbs
   basalDose: number; // Long-acting insulin dose
+  basalTiming?: string; // When long-acting insulin is taken
+  updatedAt?: string;
+  notes?: string;
 }
 
 /**
- * Hardcoded baseline parameters (never auto-modified)
- * From specification §3
+ * Baseline defaults used only as a database fallback.
  */
-export const BASELINE: BaselineParameters = {
+export const BASELINE_DEFAULTS: BaselineParameters = {
   correctionFactor: 30, // 1u lowers by 30 mg/dL
   insulinToCarbRatio: 4, // 1u per 4g carbs
   basalDose: 30, // 30u long-acting, morning
+  basalTiming: 'morning',
 };
 
 // ============================================================================
