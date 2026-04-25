@@ -6,7 +6,9 @@ import type {
   CarbEvent,
   ExerciseEvent,
   AdaptiveObservation,
+  BaselineParameters,
 } from '../types/index.js';
+import { BASELINE_DEFAULTS } from '../types/index.js';
 
 // ============================================================================
 // Row helpers
@@ -26,6 +28,94 @@ function optStr(v: Value): string | undefined {
 
 function optNum(v: Value): number | undefined {
   return v != null ? Number(v) : undefined;
+}
+
+// ============================================================================
+// Baseline Parameter Queries
+// ============================================================================
+
+export async function getBaselineParameters(): Promise<BaselineParameters & { updatedAt: string; notes?: string }> {
+  const db = getDb();
+  const result = await db.execute({
+    sql: `
+      SELECT
+        correction_factor as correctionFactor,
+        insulin_to_carb_ratio as insulinToCarbRatio,
+        basal_dose as basalDose,
+        basal_timing as basalTiming,
+        updated_at as updatedAt,
+        notes
+      FROM baseline_parameters
+      WHERE id = 1
+    `,
+    args: [],
+  });
+
+  if (result.rows.length === 0) {
+    console.error('Baseline parameters row missing; using hardcoded defaults as fallback');
+    return {
+      ...BASELINE_DEFAULTS,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  const row = result.rows[0];
+  return {
+    correctionFactor: num(row['correctionFactor']),
+    insulinToCarbRatio: num(row['insulinToCarbRatio']),
+    basalDose: num(row['basalDose']),
+    basalTiming: str(row['basalTiming']),
+    updatedAt: str(row['updatedAt']),
+    notes: optStr(row['notes']),
+  };
+}
+
+export async function updateBaselineParameters(params: Partial<{
+  correctionFactor: number;
+  insulinToCarbRatio: number;
+  basalDose: number;
+  basalTiming: string;
+  notes: string;
+}>): Promise<void> {
+  const db = getDb();
+  const updates: string[] = [];
+  const args: Value[] = [];
+
+  if (params.correctionFactor !== undefined) {
+    updates.push('correction_factor = ?');
+    args.push(params.correctionFactor);
+  }
+
+  if (params.insulinToCarbRatio !== undefined) {
+    updates.push('insulin_to_carb_ratio = ?');
+    args.push(params.insulinToCarbRatio);
+  }
+
+  if (params.basalDose !== undefined) {
+    updates.push('basal_dose = ?');
+    args.push(params.basalDose);
+  }
+
+  if (params.basalTiming !== undefined) {
+    updates.push('basal_timing = ?');
+    args.push(params.basalTiming);
+  }
+
+  if (params.notes !== undefined) {
+    updates.push('notes = ?');
+    args.push(params.notes);
+  }
+
+  updates.push("updated_at = datetime('now')");
+
+  await db.execute({
+    sql: `
+      UPDATE baseline_parameters
+      SET ${updates.join(', ')}
+      WHERE id = 1
+    `,
+    args,
+  });
 }
 
 // ============================================================================

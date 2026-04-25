@@ -113,5 +113,25 @@ export async function runMigrations(): Promise<void> {
     )
   `);
 
+  // Baseline parameters table
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS baseline_parameters (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      correction_factor REAL NOT NULL DEFAULT 30,
+      insulin_to_carb_ratio REAL NOT NULL DEFAULT 4,
+      basal_dose REAL NOT NULL DEFAULT 30,
+      basal_timing TEXT NOT NULL DEFAULT 'morning',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      notes TEXT
+    )
+  `);
+
+  await db.execute(`
+    INSERT OR IGNORE INTO baseline_parameters (
+      id, correction_factor, insulin_to_carb_ratio, basal_dose, basal_timing
+    )
+    VALUES (1, 30, 4, 30, 'morning')
+  `);
+
   console.error('✅ Migrations completed');
 }

@@ -44,6 +44,8 @@ import {
 import {
   getBaselineParametersTool,
   getBaselineParametersHandler,
+  updateBaselineParametersTool,
+  updateBaselineParametersHandler,
   predictGlucoseImpactTool,
   predictGlucoseImpactHandler,
   getAdaptiveInsightsTool,
@@ -393,6 +395,46 @@ export function registerAllTools(server: Server): void {
         },
       },
       {
+        name: updateBaselineParametersTool.name,
+        description: updateBaselineParametersTool.description,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            correction_factor: {
+              type: 'number',
+              description: 'New ISF value (mg/dL drop per 1 unit)',
+            },
+            insulin_to_carb_ratio: {
+              type: 'number',
+              description: 'New ICR value (grams of carbs per 1 unit)',
+            },
+            basal_dose: {
+              type: 'number',
+              description: 'New long-acting dose in units',
+            },
+            basal_timing: {
+              type: 'string',
+              description: 'When long-acting is taken',
+            },
+            notes: {
+              type: 'string',
+              description: 'Reason for the change',
+            },
+            confirmed: {
+              type: 'boolean',
+              description: 'Set to true only after explicit human approval',
+            },
+          },
+          anyOf: [
+            { required: ['correction_factor'] },
+            { required: ['insulin_to_carb_ratio'] },
+            { required: ['basal_dose'] },
+            { required: ['basal_timing'] },
+            { required: ['notes'] },
+          ],
+        },
+      },
+      {
         name: predictGlucoseImpactTool.name,
         description: predictGlucoseImpactTool.description,
         inputSchema: {
@@ -485,6 +527,8 @@ export function registerAllTools(server: Server): void {
       // Modeling Tools
       case getBaselineParametersTool.name:
         return await getBaselineParametersHandler();
+      case updateBaselineParametersTool.name:
+        return await updateBaselineParametersHandler(args as any);
       case predictGlucoseImpactTool.name:
         return await predictGlucoseImpactHandler(args as any);
       case getAdaptiveInsightsTool.name:

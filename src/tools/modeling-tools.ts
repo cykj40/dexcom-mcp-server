@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { BASELINE } from '../types/index.js';
 import {
   predictGlucoseImpact,
   predictCarbImpact,
@@ -7,6 +6,7 @@ import {
   detectParameterDrift,
 } from '../services/modeling.service.js';
 import { getLatestReading } from '../services/glucose.service.js';
+import { getBaselineParameters, updateBaselineParameters } from '../db/queries.js';
 
 /**
  * Modeling MCP Tools
@@ -24,6 +24,8 @@ export const getBaselineParametersTool = {
 };
 
 export async function getBaselineParametersHandler() {
+  const baseline = await getBaselineParameters();
+
   return {
     content: [
       {
@@ -32,19 +34,22 @@ export async function getBaselineParametersHandler() {
           {
             baselineParameters: {
               insulinSensitivityFactor: {
-                value: BASELINE.correctionFactor,
-                description: `1 unit of insulin lowers glucose by ${BASELINE.correctionFactor} mg/dL`,
+                value: baseline.correctionFactor,
+                description: `1 unit of insulin lowers glucose by ${baseline.correctionFactor} mg/dL`,
               },
               insulinToCarbRatio: {
-                value: BASELINE.insulinToCarbRatio,
-                description: `1 unit of insulin covers ${BASELINE.insulinToCarbRatio}g of carbohydrates`,
+                value: baseline.insulinToCarbRatio,
+                description: `1 unit of insulin covers ${baseline.insulinToCarbRatio}g of carbohydrates`,
               },
               basalDose: {
-                value: BASELINE.basalDose,
-                description: `${BASELINE.basalDose} units of long-acting insulin, taken in the morning`,
+                value: baseline.basalDose,
+                description: `${baseline.basalDose} units of long-acting insulin, taken ${baseline.basalTiming ?? 'as configured'}`,
               },
+              basalTiming: baseline.basalTiming,
+              updatedAt: baseline.updatedAt,
+              notes: baseline.notes,
             },
-            note: 'These baseline parameters are never auto-modified. The system can observe deviations and suggest updates, but you decide whether to change them.',
+            note: 'These baseline parameters are user-configurable. The system can observe deviations and suggest updates, but you decide whether to change them.',
           },
           null,
           2
@@ -52,6 +57,174 @@ export async function getBaselineParametersHandler() {
       },
     ],
   };
+}
+
+// ============================================================================
+// Tool: update_baseline_parameters
+// ============================================================================
+
+export const updateBaselineParametersTool = {
+  name: 'update_baseline_parameters',
+  description:
+    'Update your personal baseline diabetes parameters (ISF, ICR, basal dose). This requires your explicit confirmation as it affects all future predictions. HUMAN APPROVAL REQUIRED.',
+  inputSchema: z.object({
+    correction_factor: z
+      .number()
+      .positive()
+      .optional()
+      .describe('New ISF value (mg/dL drop per 1 unit)'),
+    insulin_to_carb_ratio: z
+      .number()
+      .positive()
+      .optional()
+      .describe('New ICR value (grams of carbs per 1 unit)'),
+    basal_dose: z
+      .number()
+      .positive()
+      .optional()
+      .describe('New long-acting dose in units'),
+    basal_timing: z.string().optional().describe('When long-acting is taken'),
+    notes: z.string().optional().describe('Reason for the change'),
+    confirmed: z.boolean().optional(),
+  }).strict().refine(
+    (args) =>
+      args.correction_factor !== undefined ||
+      args.insulin_to_carb_ratio !== undefined ||
+      args.basal_dose !== undefined ||
+      args.basal_timing !== undefined ||
+      args.notes !== undefined,
+    'At least one baseline parameter or notes field is required'
+  ),
+};
+
+type UpdateBaselineParametersArgs = {
+  correction_factor?: number;
+  insulin_to_carb_ratio?: number;
+  basal_dose?: number;
+  basal_timing?: string;
+  notes?: string;
+  confirmed?: boolean;
+};
+
+function baselineDisplay(params: {
+  correctionFactor: number;
+  insulinToCarbRatio: number;
+  basalDose: number;
+  basalTiming?: string;
+  notes?: string;
+}): string {
+  return [
+    `correctionFactor: ${params.correctionFactor}`,
+    `insulinToCarbRatio: ${params.insulinToCarbRatio}`,
+    `basalDose: ${params.basalDose}`,
+    `basalTiming: ${params.basalTiming ?? 'not set'}`,
+    `notes: ${params.notes ?? 'none'}`,
+  ].join(', ');
+}
+
+export async function updateBaselineParametersHandler(args: UpdateBaselineParametersArgs = {}) {
+  try {
+    const hasUpdate =
+      args.correction_factor !== undefined ||
+      args.insulin_to_carb_ratio !== undefined ||
+      args.basal_dose !== undefined ||
+      args.basal_timing !== undefined ||
+      args.notes !== undefined;
+
+    if (!hasUpdate) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Error: At least one baseline parameter or notes field is required',
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const current = await getBaselineParameters();
+    const proposed = {
+      correctionFactor: args.correction_factor ?? current.correctionFactor,
+      insulinToCarbRatio: args.insulin_to_carb_ratio ?? current.insulinToCarbRatio,
+      basalDose: args.basal_dose ?? current.basalDose,
+      basalTiming: args.basal_timing ?? current.basalTiming,
+      notes: args.notes ?? current.notes,
+    };
+
+    const changes: string[] = [];
+    if (args.correction_factor !== undefined && args.correction_factor !== current.correctionFactor) {
+      changes.push(`Changing correctionFactor from ${current.correctionFactor} to ${args.correction_factor}`);
+    }
+    if (args.insulin_to_carb_ratio !== undefined && args.insulin_to_carb_ratio !== current.insulinToCarbRatio) {
+      changes.push(`Changing insulinToCarbRatio from ${current.insulinToCarbRatio} to ${args.insulin_to_carb_ratio}`);
+    }
+    if (args.basal_dose !== undefined && args.basal_dose !== current.basalDose) {
+      changes.push(`Changing basalDose from ${current.basalDose} to ${args.basal_dose}`);
+    }
+    if (args.basal_timing !== undefined && args.basal_timing !== current.basalTiming) {
+      changes.push(`Changing basalTiming from ${current.basalTiming ?? 'not set'} to ${args.basal_timing}`);
+    }
+    if (args.notes !== undefined && args.notes !== current.notes) {
+      changes.push(`Changing notes from ${current.notes ?? 'none'} to ${args.notes}`);
+    }
+
+    if (args.confirmed !== true) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              '⚠️ PARAMETER UPDATE — HUMAN APPROVAL REQUIRED\n\n' +
+              'These parameters directly affect all glucose predictions. You must confirm this change.\n\n' +
+              'To confirm, call this tool again with confirmed: true added to your request.\n\n' +
+              `Current values: ${baselineDisplay(current)}\n` +
+              `Proposed values: ${baselineDisplay(proposed)}\n\n` +
+              'Consult your healthcare provider before changing insulin parameters.\n\n' +
+              `Changes: ${changes.length > 0 ? changes.join('; ') : 'No value changes detected'}`,
+          },
+        ],
+      };
+    }
+
+    await updateBaselineParameters({
+      correctionFactor: args.correction_factor,
+      insulinToCarbRatio: args.insulin_to_carb_ratio,
+      basalDose: args.basal_dose,
+      basalTiming: args.basal_timing,
+      notes: args.notes,
+    });
+
+    const updated = await getBaselineParameters();
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              success: true,
+              message: 'Baseline parameters updated.',
+              changes,
+              baselineParameters: updated,
+              disclaimer: 'Consult your healthcare provider before changing insulin parameters.',
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Error updating baseline parameters: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+      isError: true,
+    };
+  }
 }
 
 // ============================================================================
@@ -133,17 +306,18 @@ export async function predictGlucoseImpactHandler(args: {
       };
     }
 
+    const baseline = await getBaselineParameters();
     const predictions: any = {
       currentGlucose,
       baselineParameters: {
-        isf: BASELINE.correctionFactor,
-        icr: BASELINE.insulinToCarbRatio,
+        isf: baseline.correctionFactor,
+        icr: baseline.insulinToCarbRatio,
       },
     };
 
     // Predict insulin impact
     if (args.action_type === 'insulin' && args.insulin_units) {
-      const insulinPrediction = predictGlucoseImpact(
+      const insulinPrediction = await predictGlucoseImpact(
         {
           units: args.insulin_units,
           type: 'rapid',
@@ -156,7 +330,7 @@ export async function predictGlucoseImpactHandler(args: {
 
     // Predict carb impact
     if (args.action_type === 'carbs' && args.carb_grams) {
-      const carbPrediction = predictCarbImpact(
+      const carbPrediction = await predictCarbImpact(
         {
           grams: args.carb_grams,
           timestamp: new Date().toISOString(),
@@ -168,7 +342,7 @@ export async function predictGlucoseImpactHandler(args: {
 
     // Predict combined impact
     if (args.action_type === 'both' && args.insulin_units && args.carb_grams) {
-      const insulinPrediction = predictGlucoseImpact(
+      const insulinPrediction = await predictGlucoseImpact(
         {
           units: args.insulin_units,
           type: 'rapid',
@@ -177,7 +351,7 @@ export async function predictGlucoseImpactHandler(args: {
         currentGlucose
       );
 
-      const carbPrediction = predictCarbImpact(
+      const carbPrediction = await predictCarbImpact(
         {
           grams: args.carb_grams,
           timestamp: new Date().toISOString(),
@@ -254,6 +428,7 @@ export const getAdaptiveInsightsTool = {
 export async function getAdaptiveInsightsHandler(args: { days?: number }) {
   try {
     const days = args.days || 14;
+    const baseline = await getBaselineParameters();
     const drift = await getRecentDrift(days);
     const driftAnalysis = await detectParameterDrift(days);
 
@@ -265,9 +440,12 @@ export async function getAdaptiveInsightsHandler(args: { days?: number }) {
             {
               analysisWindow: `${days} days`,
               baselineParameters: {
-                isf: BASELINE.correctionFactor,
-                icr: BASELINE.insulinToCarbRatio,
-                basalDose: BASELINE.basalDose,
+                isf: baseline.correctionFactor,
+                icr: baseline.insulinToCarbRatio,
+                basalDose: baseline.basalDose,
+                basalTiming: baseline.basalTiming,
+                updatedAt: baseline.updatedAt,
+                notes: baseline.notes,
               },
               observationsSummary: drift.summary,
               detectedDrift: {

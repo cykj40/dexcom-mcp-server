@@ -205,13 +205,13 @@ export async function compareExpectedVsActualHandler(args: {
         type: 'rapid' as const,
         timestamp: args.event_timestamp,
       };
-      prediction = predictGlucoseImpact(insulinEvent, args.current_glucose);
+      prediction = await predictGlucoseImpact(insulinEvent, args.current_glucose);
     } else {
       const carbEvent = {
         grams: args.event_value,
         timestamp: args.event_timestamp,
       };
-      prediction = predictCarbImpact(carbEvent, args.current_glucose);
+      prediction = await predictCarbImpact(carbEvent, args.current_glucose);
     }
 
     // Analyze outcome

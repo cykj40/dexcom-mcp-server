@@ -5,8 +5,12 @@ import type {
   GlucosePrediction,
   AdaptiveObservation,
 } from '../types/index.js';
-import { BASELINE } from '../types/index.js';
-import { insertAdaptiveObservation, getRecentObservations, getObservationsByType } from '../db/queries.js';
+import {
+  insertAdaptiveObservation,
+  getRecentObservations,
+  getObservationsByType,
+  getBaselineParameters,
+} from '../db/queries.js';
 import { getReadingsInRange } from '../db/queries.js';
 
 /**
@@ -19,8 +23,8 @@ import { getReadingsInRange } from '../db/queries.js';
  * Predict glucose impact from insulin dose
  * Based on Insulin Sensitivity Factor (ISF) from baseline
  */
-export function predictGlucoseImpact(insulin: InsulinEvent, currentGlucose: number): GlucosePrediction {
-  const { correctionFactor } = BASELINE;
+export async function predictGlucoseImpact(insulin: InsulinEvent, currentGlucose: number): Promise<GlucosePrediction> {
+  const { correctionFactor } = await getBaselineParameters();
 
   // Expected glucose drop = units * correction factor
   const predictedChange = -(insulin.units * correctionFactor);
@@ -47,8 +51,8 @@ export function predictGlucoseImpact(insulin: InsulinEvent, currentGlucose: numb
  * Predict glucose impact from carbohydrate intake
  * Based on Insulin-to-Carb Ratio (ICR) from baseline
  */
-export function predictCarbImpact(carbs: CarbEvent, currentGlucose: number): GlucosePrediction {
-  const { insulinToCarbRatio, correctionFactor } = BASELINE;
+export async function predictCarbImpact(carbs: CarbEvent, currentGlucose: number): Promise<GlucosePrediction> {
+  const { insulinToCarbRatio, correctionFactor } = await getBaselineParameters();
 
   // Equivalent insulin units needed to cover these carbs
   const equivalentInsulin = carbs.grams / insulinToCarbRatio;
@@ -142,6 +146,7 @@ export async function detectParameterDrift(days: number = 14): Promise<{
   };
   recommendation: string;
 }> {
+  const baselineParameters = await getBaselineParameters();
   const observations = await getRecentObservations(days);
 
   // Group observations by type
@@ -210,8 +215,8 @@ export async function detectParameterDrift(days: number = 14): Promise<{
 
   const recommendation =
     patterns.length > 0
-      ? 'These are observations about apparent changes. Would you like to discuss whether your baseline parameters should be updated?'
-      : 'No significant parameter drift detected. Your baseline parameters appear to be working well.';
+      ? `These are observations about apparent changes against current baseline parameters (ISF ${baselineParameters.correctionFactor}, ICR ${baselineParameters.insulinToCarbRatio}). Would you like to discuss whether your baseline parameters should be updated?`
+      : `No significant parameter drift detected. Your current baseline parameters (ISF ${baselineParameters.correctionFactor}, ICR ${baselineParameters.insulinToCarbRatio}) appear to be working well.`;
 
   return {
     observations,
