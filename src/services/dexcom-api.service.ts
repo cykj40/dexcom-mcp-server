@@ -2,89 +2,68 @@ import { env, getDexcomApiBaseUrl } from '../config/env.js';
 import type { DexcomEGV, DexcomDataRange, DexcomDevice, GlucoseReading } from '../types/index.js';
 import { TREND_DESCRIPTIONS } from '../types/index.js';
 import { insertGlucoseReading } from '../db/queries.js';
-import { getToken, setToken } from '../db/token-store.js';
+import { getTokenSet, setTokenSet } from '../db/token-store.js';
+import { z } from 'zod';
 
 /**
  * Dexcom Developer API Service (Primary Data Source)
  * Official documented API with OAuth 2.0 authentication
  */
 
-let accessToken = env.DEXCOM_ACCESS_TOKEN;
-let refreshToken = env.DEXCOM_REFRESH_TOKEN;
+let accessToken: string | null = null;
+let refreshToken: string | null = null;
 let tokenExpiresAt: Date | null = null;
 
 const BASE_URL = getDexcomApiBaseUrl();
+const PROACTIVE_REFRESH_WINDOW_MS = 120 * 1000;
+
+const tokenResponseSchema = z.object({
+  access_token: z.string().min(1),
+  refresh_token: z.string().min(1),
+  expires_in: z.number().positive(),
+});
 
 /**
- * Load persisted tokens from the database, falling back to env vars.
+ * Load persisted tokens from Turso, with env vars as one-time bootstrap only.
  * Must be called after the database is initialized.
  */
 export async function initializeTokens(): Promise<void> {
-  try {
-    const [dbAccess, dbRefresh] = await Promise.all([
-      getToken('access_token'),
-      getToken('refresh_token'),
-    ]);
+  const dbTokens = await getTokenSet();
 
-    if (dbAccess) {
-      accessToken = dbAccess;
-      console.error('[Dexcom API] Loaded access_token from database');
-    }
-    if (dbRefresh) {
-      refreshToken = dbRefresh;
-      console.error('[Dexcom API] Loaded refresh_token from database');
-    }
-  } catch (error) {
-    console.error('[Dexcom API] Could not load tokens from DB, using env vars:', error);
+  if (dbTokens) {
+    accessToken = dbTokens.accessToken;
+    refreshToken = dbTokens.refreshToken;
+    tokenExpiresAt = dbTokens.expiresAt;
+    console.error(`[Dexcom API] Loaded OAuth tokens from Turso, expires: ${tokenExpiresAt?.toISOString() ?? 'unknown'}`);
+  } else if (env.DEXCOM_ACCESS_TOKEN && env.DEXCOM_REFRESH_TOKEN) {
+    accessToken = env.DEXCOM_ACCESS_TOKEN;
+    refreshToken = env.DEXCOM_REFRESH_TOKEN;
+    tokenExpiresAt = new Date(0);
+    await setTokenSet({ accessToken, refreshToken, expiresAt: tokenExpiresAt });
+    console.error('[Dexcom API] Seeded Turso from optional env OAuth tokens. Remove env token values after this one-time bootstrap.');
+  } else {
+    accessToken = null;
+    refreshToken = null;
+    tokenExpiresAt = null;
+    console.error('[Dexcom API] No Dexcom OAuth tokens found in Turso. Start the one-time consent flow with `npm run oauth` and seed Turso before calling Dexcom API tools.');
+    return;
   }
 
-  tokenExpiresAt = getTokenExpiration(accessToken);
-  console.error(`[Dexcom API] Token initialized, expires: ${tokenExpiresAt?.toISOString() ?? 'unknown'}`);
-
-  // Refresh immediately if expired or expiring within 24 hours
-  const twentyFourHoursFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  if (!tokenExpiresAt || tokenExpiresAt <= twentyFourHoursFromNow) {
-    console.error('[Dexcom API] Token expired or expiring within 24h, refreshing on startup...');
-    try {
-      await refreshAccessToken();
-    } catch (error) {
-      console.error('[Dexcom API] Startup token refresh failed:', error);
-      // Non-fatal: server still starts, will retry on first API call
-    }
+  if (isTokenExpiringSoon()) {
+    console.error('[Dexcom API] Token expired or expiring soon, refreshing on startup...');
+    await refreshAccessToken();
   }
 }
 
 /**
- * Parse JWT token and extract expiration time
- */
-function getTokenExpiration(token: string): Date | null {
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString()) as { exp?: number };
-    if (payload.exp) {
-      return new Date(payload.exp * 1000);
-    }
-  } catch (error) {
-    console.error('[Dexcom API] Failed to parse token expiration:', error);
-  }
-  return null;
-}
-
-/**
- * Check if token is expired or will expire within the next 5 minutes
+ * Check if token is expired or will expire within the next 120 seconds.
  */
 function isTokenExpiringSoon(): boolean {
   if (!tokenExpiresAt) {
-    tokenExpiresAt = getTokenExpiration(accessToken);
-  }
-
-  if (!tokenExpiresAt) {
-    // If we can't determine expiration, assume it might be expired
     return true;
   }
 
-  // Check if token expires within 5 minutes
-  const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
-  return tokenExpiresAt <= fiveMinutesFromNow;
+  return Date.now() >= tokenExpiresAt.getTime() - PROACTIVE_REFRESH_WINDOW_MS;
 }
 
 /**
@@ -105,16 +84,18 @@ async function makeApiRequest<T>(endpoint: string, options: RequestInit = {}): P
   // Proactively refresh token if it's expiring soon
   if (isTokenExpiringSoon()) {
     console.error('[Dexcom API] Token expiring soon, proactively refreshing...');
-    try {
-      await refreshAccessToken();
-    } catch (error) {
-      console.error('[Dexcom API] Proactive refresh failed, will retry on 401:', error);
-    }
+    await refreshAccessToken();
   }
 
   const url = `${BASE_URL}${endpoint}`;
+  const method = options.method ?? 'GET';
+  const canRetryAuth = method === 'GET' || method === 'HEAD';
 
-  console.error(`[Dexcom API] ${options.method || 'GET'} ${url}`);
+  if (!accessToken) {
+    throw new Error('Dexcom OAuth tokens are not initialized. Complete the one-time OAuth consent flow before calling Dexcom API tools.');
+  }
+
+  console.error(`[Dexcom API] ${method} ${url}`);
 
   const response = await fetch(url, {
     ...options,
@@ -128,7 +109,7 @@ async function makeApiRequest<T>(endpoint: string, options: RequestInit = {}): P
   console.error(`[Dexcom API] Response: ${response.status} ${response.statusText}`);
 
   // Handle 401 - token expired, try to refresh
-  if (response.status === 401) {
+  if (response.status === 401 && canRetryAuth) {
     console.error('[Dexcom API] Access token expired, attempting refresh...');
     await refreshAccessToken();
 
@@ -147,6 +128,10 @@ async function makeApiRequest<T>(endpoint: string, options: RequestInit = {}): P
     }
 
     return retryResponse.json() as Promise<T>;
+  }
+
+  if (response.status === 401) {
+    throw new Error('Dexcom API authentication failed after request dispatch; not retrying non-read request');
   }
 
   // Handle 429 - rate limit
@@ -185,6 +170,10 @@ async function makeApiRequest<T>(endpoint: string, options: RequestInit = {}): P
  * Refresh the OAuth access token and persist to database
  */
 async function refreshAccessToken(): Promise<void> {
+  if (!refreshToken) {
+    throw new Error('Dexcom refresh token is not initialized. Complete the one-time OAuth consent flow before calling Dexcom API tools.');
+  }
+
   const response = await fetch(`${BASE_URL}/v3/oauth2/token`, {
     method: 'POST',
     headers: {
@@ -205,38 +194,36 @@ async function refreshAccessToken(): Promise<void> {
     throw new Error(`Failed to refresh token: ${response.status} ${response.statusText} - ${errorBody}`);
   }
 
-  const data = await response.json() as { access_token: string; refresh_token: string };
-  accessToken = data.access_token;
-  refreshToken = data.refresh_token;
-
-  // Update token expiration
-  tokenExpiresAt = getTokenExpiration(accessToken);
+  const data = tokenResponseSchema.parse(await response.json());
+  const nextExpiresAt = new Date(Date.now() + data.expires_in * 1000);
 
   console.error('✅ Access token refreshed successfully');
-  if (tokenExpiresAt) {
-    console.error(`   New token expires at: ${tokenExpiresAt.toISOString()}`);
+  console.error(`   New token expires at: ${nextExpiresAt.toISOString()}`);
+
+  try {
+    await setTokenSet({
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresAt: nextExpiresAt,
+    });
+    console.error('✅ Tokens persisted to database');
+  } catch {
+    console.error('[Dexcom API] Failed to persist rotated OAuth tokens to Turso. Refusing to continue with in-memory tokens.');
+    throw new Error('Failed to persist rotated Dexcom OAuth tokens to Turso');
   }
 
-  // Persist tokens to database so they survive VM restarts
-  try {
-    await Promise.all([
-      setToken('access_token', accessToken),
-      setToken('refresh_token', refreshToken),
-    ]);
-    console.error('✅ Tokens persisted to database');
-  } catch (err) {
-    console.error('[Dexcom API] Failed to persist tokens to DB:', err);
-    // Non-fatal: tokens are still in memory for this session
-    console.error('⚠️  Fallback: update your .env for persistence:');
-    console.error(`DEXCOM_ACCESS_TOKEN=${accessToken}`);
-    console.error(`DEXCOM_REFRESH_TOKEN=${refreshToken}`);
-  }
+  accessToken = data.access_token;
+  refreshToken = data.refresh_token;
+  tokenExpiresAt = nextExpiresAt;
 }
 
 /**
  * Get current access token (for external use if needed)
  */
 export function getCurrentAccessToken(): string {
+  if (!accessToken) {
+    throw new Error('Dexcom access token is not initialized');
+  }
   return accessToken;
 }
 
@@ -244,6 +231,9 @@ export function getCurrentAccessToken(): string {
  * Get current refresh token (for external use if needed)
  */
 export function getCurrentRefreshToken(): string {
+  if (!refreshToken) {
+    throw new Error('Dexcom refresh token is not initialized');
+  }
   return refreshToken;
 }
 

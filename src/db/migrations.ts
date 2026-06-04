@@ -109,9 +109,18 @@ export async function runMigrations(): Promise<void> {
     CREATE TABLE IF NOT EXISTS tokens (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
+      expires_at TEXT,
       updated_at TEXT NOT NULL
     )
   `);
+
+  try {
+    await db.execute('ALTER TABLE tokens ADD COLUMN expires_at TEXT');
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.toLowerCase().includes('duplicate column')) {
+      throw error;
+    }
+  }
 
   // Baseline parameters table
   await db.execute(`
