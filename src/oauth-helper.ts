@@ -15,7 +15,7 @@
 
 import { createServer } from 'node:http';
 import { URL } from 'node:url';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as crypto from 'node:crypto';
 
@@ -205,16 +205,7 @@ function generateState(): string {
         console.log(`  Token Type:    ${tokenData.token_type}`);
         console.log('');
 
-        // Write tokens to .env
-        const envPath = resolve(process.cwd(), '.env');
-        let envContent = readFileSync(envPath, 'utf-8');
-
-        envContent = upsertEnvVar(envContent, 'DEXCOM_ACCESS_TOKEN', tokenData.access_token);
-        envContent = upsertEnvVar(envContent, 'DEXCOM_REFRESH_TOKEN', tokenData.refresh_token);
-
-        writeFileSync(envPath, envContent, 'utf-8');
-
-        console.log('✅ Tokens written to .env automatically!');
+        console.log('Seed Turso with these tokens once, or set them as temporary bootstrap env vars before first boot.');
         console.log('');
         console.log('You can now start the MCP server:');
         console.log('');
@@ -223,7 +214,7 @@ function generateState(): string {
 
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(
-          '<h1>Success!</h1><p>Tokens have been saved to your <code>.env</code> file. You can close this tab.</p>'
+          '<h1>Success!</h1><p>Tokens were printed in your terminal for one-time Turso bootstrap. You can close this tab.</p>'
         );
       } catch (err) {
         console.error('\n❌ Token exchange failed:', err);
@@ -244,17 +235,3 @@ function generateState(): string {
     process.exit(1);
   }
 })();
-
-// ---------------------------------------------------------------------------
-// Utility — insert or update a key in .env content
-// ---------------------------------------------------------------------------
-function upsertEnvVar(content: string, key: string, value: string): string {
-  const regex = new RegExp(`^${key}=.*$`, 'm');
-  const newLine = `${key}=${value}`;
-
-  if (regex.test(content)) {
-    return content.replace(regex, newLine);
-  }
-  // Append if not found
-  return content.trimEnd() + '\n' + newLine + '\n';
-}

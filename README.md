@@ -48,8 +48,8 @@ This is a **human-in-the-loop assistive intelligence system**:
    - `DEXCOM_CLIENT_ID` - From Dexcom Developer Portal
    - `DEXCOM_CLIENT_SECRET` - From Dexcom Developer Portal
    - `DEXCOM_REDIRECT_URI` - OAuth redirect URI
-   - `DEXCOM_ACCESS_TOKEN` - OAuth access token
-   - `DEXCOM_REFRESH_TOKEN` - OAuth refresh token
+   - `TURSO_DATABASE_URL` - Turso database URL for token and glucose persistence
+   - `DEXCOM_ACCESS_TOKEN` / `DEXCOM_REFRESH_TOKEN` - Optional one-time bootstrap only when Turso has no tokens
 
 4. Build the project:
    ```bash
@@ -78,9 +78,8 @@ Add to your `claude_desktop_config.json`:
         "DEXCOM_CLIENT_ID": "your_client_id",
         "DEXCOM_CLIENT_SECRET": "your_client_secret",
         "DEXCOM_REDIRECT_URI": "your_redirect_uri",
-        "DEXCOM_ACCESS_TOKEN": "your_access_token",
-        "DEXCOM_REFRESH_TOKEN": "your_refresh_token",
-        "DB_PATH": "/absolute/path/to/dexcom-mcp-server/data/dexcom.db"
+        "TURSO_DATABASE_URL": "libsql://your-db.turso.io",
+        "TURSO_AUTH_TOKEN": "your_turso_auth_token"
       }
     }
   }

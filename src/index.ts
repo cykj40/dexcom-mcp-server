@@ -49,11 +49,12 @@ async function main() {
     process.exit(1);
   }
 
-  // Load persisted OAuth tokens from DB (fall back to env vars if not found)
+  // Load persisted OAuth tokens from Turso, with env vars as one-time bootstrap only
   try {
     await initializeTokens();
   } catch (error) {
-    console.error('⚠️  Token initialization warning (using env vars):', error);
+    console.error('❌ Token initialization failed:', error);
+    process.exit(1);
   }
 
   // Create MCP server

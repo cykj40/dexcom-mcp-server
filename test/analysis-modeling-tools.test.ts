@@ -48,6 +48,14 @@ vi.mock('../src/services/chart.service.js', () => ({
 
 vi.mock('../src/db/queries.js', () => ({
   getReadingsInRange: vi.fn(),
+  getBaselineParameters: vi.fn(() => ({
+    correctionFactor: 30,
+    insulinToCarbRatio: 4,
+    basalDose: 30,
+    basalTiming: 'morning',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  })),
+  updateBaselineParameters: vi.fn(),
 }));
 
 import {
@@ -320,7 +328,7 @@ describe('Modeling Tools', () => {
             description: expect.stringContaining('long-acting'),
           },
         },
-        note: expect.stringContaining('never auto-modified'),
+        note: expect.stringContaining('you decide whether to change them'),
       });
 
       console.log('\nBaseline Parameters:', JSON.stringify(data.baselineParameters, null, 2));

@@ -7,7 +7,7 @@
  * You'll manually copy the authorization code from the browser.
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as readline from 'node:readline/promises';
 
@@ -123,29 +123,10 @@ try {
   console.log(`  Token Type:    ${tokenData.token_type}`);
   console.log('');
 
-  // Write tokens to .env
-  const envPath = resolve(process.cwd(), '.env');
-  let envContent = readFileSync(envPath, 'utf-8');
-
-  envContent = upsertEnvVar(envContent, 'DEXCOM_ACCESS_TOKEN', tokenData.access_token);
-  envContent = upsertEnvVar(envContent, 'DEXCOM_REFRESH_TOKEN', tokenData.refresh_token);
-
-  writeFileSync(envPath, envContent, 'utf-8');
-
-  console.log('✅ Tokens written to .env!');
+  console.log('Seed Turso with these tokens once, or set them as temporary bootstrap env vars before first boot.');
   console.log('');
 
 } catch (err) {
   console.error('\n❌ Token exchange failed:', err);
   process.exit(1);
-}
-
-function upsertEnvVar(content: string, key: string, value: string): string {
-  const regex = new RegExp(`^${key}=.*$`, 'm');
-  const newLine = `${key}=${value}`;
-
-  if (regex.test(content)) {
-    return content.replace(regex, newLine);
-  }
-  return content.trimEnd() + '\n' + newLine + '\n';
 }

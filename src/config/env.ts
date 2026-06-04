@@ -10,8 +10,8 @@ const envSchema = z.object({
   DEXCOM_CLIENT_ID: z.string().trim().min(1, 'DEXCOM_CLIENT_ID is required'),
   DEXCOM_CLIENT_SECRET: z.string().trim().min(1, 'DEXCOM_CLIENT_SECRET is required'),
   DEXCOM_REDIRECT_URI: z.string().trim().url('DEXCOM_REDIRECT_URI must be a valid URL'),
-  DEXCOM_ACCESS_TOKEN: z.string().trim().min(1, 'DEXCOM_ACCESS_TOKEN is required'),
-  DEXCOM_REFRESH_TOKEN: z.string().trim().min(1, 'DEXCOM_REFRESH_TOKEN is required'),
+  DEXCOM_ACCESS_TOKEN: z.string().trim().min(1).optional(),
+  DEXCOM_REFRESH_TOKEN: z.string().trim().min(1).optional(),
 
   // Dexcom Share API (optional fallback)
   DEXCOM_SHARE_USERNAME: z.string().optional(),
