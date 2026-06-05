@@ -1,5 +1,5 @@
-import type { GlucoseReading, ChartData, EventTimeline } from '../types/index.js';
-import { TARGET_RANGE } from '../types/index.js';
+import type { ChartData, EventTimeline, GlucoseReading } from '../types/index.js'
+import { TARGET_RANGE } from '../types/index.js'
 
 /**
  * Chart Service
@@ -9,10 +9,7 @@ import { TARGET_RANGE } from '../types/index.js';
 /**
  * Generate a glucose timeline chart with optional event overlays
  */
-export function glucoseTimeSeries(
-  readings: GlucoseReading[],
-  events?: EventTimeline[]
-): ChartData {
+export function glucoseTimeSeries(readings: GlucoseReading[], events?: EventTimeline[]): ChartData {
   const data = readings.map((r) => ({
     time: r.recordedAt,
     value: r.value,
@@ -22,9 +19,9 @@ export function glucoseTimeSeries(
         : r.value < TARGET_RANGE.LOW
           ? 'low'
           : 'high',
-  }));
+  }))
 
-  const layers: any[] = [
+  const layers: Record<string, unknown>[] = [
     // Target range band
     {
       mark: { type: 'rect', opacity: 0.2 },
@@ -61,7 +58,7 @@ export function glucoseTimeSeries(
         },
       },
     },
-  ];
+  ]
 
   // Add event markers if provided
   if (events) {
@@ -70,23 +67,23 @@ export function glucoseTimeSeries(
       .map((e) => ({
         time: e.timestamp,
         type: 'Insulin',
-      }));
+      }))
 
     const carbEvents = events
       .filter((e) => e.eventType === 'carbs')
       .map((e) => ({
         time: e.timestamp,
         type: 'Carbs',
-      }));
+      }))
 
     const exerciseEvents = events
       .filter((e) => e.eventType === 'exercise')
       .map((e) => ({
         time: e.timestamp,
         type: 'Exercise',
-      }));
+      }))
 
-    const allEventMarkers = [...insulinEvents, ...carbEvents, ...exerciseEvents];
+    const allEventMarkers = [...insulinEvents, ...carbEvents, ...exerciseEvents]
 
     if (allEventMarkers.length > 0) {
       layers.push({
@@ -112,7 +109,7 @@ export function glucoseTimeSeries(
             },
           },
         },
-      });
+      })
     }
   }
 
@@ -123,37 +120,36 @@ export function glucoseTimeSeries(
     height: 400,
     data: { values: data },
     layer: layers,
-  };
+  }
 
   const eventDescription = events
     ? ` with ${events.length} logged events (insulin, carbs, exercise)`
-    : '';
-  const description = `Glucose timeline showing ${readings.length} readings${eventDescription}. Green shaded area represents target range (${TARGET_RANGE.LOW}-${TARGET_RANGE.HIGH} mg/dL). Line color indicates glucose status: green (in range), red (low), orange (high).`;
+    : ''
+  const description = `Glucose timeline showing ${readings.length} readings${eventDescription}. Green shaded area represents target range (${TARGET_RANGE.LOW}-${TARGET_RANGE.HIGH} mg/dL). Line color indicates glucose status: green (in range), red (low), orange (high).`
 
-  return { spec, description };
+  return { spec, description }
 }
 
 /**
  * Generate a daily summary chart (24-hour view)
  */
-export function dailySummaryChart(
-  readings: GlucoseReading[],
-  events?: EventTimeline[]
-): ChartData {
+export function dailySummaryChart(readings: GlucoseReading[], events?: EventTimeline[]): ChartData {
   if (readings.length === 0) {
     return {
       spec: { data: { values: [] } },
       description: 'No data available for this day',
-    };
+    }
   }
 
-  return glucoseTimeSeries(readings, events);
+  return glucoseTimeSeries(readings, events)
 }
 
 /**
  * Generate a weekly overview chart
  */
-export function weeklyOverview(dailyStats: Array<{ date: string; avgGlucose: number; timeInRange: number }>): ChartData {
+export function weeklyOverview(
+  dailyStats: Array<{ date: string; avgGlucose: number; timeInRange: number }>,
+): ChartData {
   const spec = {
     $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
     description: 'Weekly glucose overview',
@@ -201,11 +197,11 @@ export function weeklyOverview(dailyStats: Array<{ date: string; avgGlucose: num
       },
     ],
     resolve: { scale: { y: 'independent' } },
-  };
+  }
 
-  const description = `Weekly overview showing daily average glucose (blue line) and time in range percentage (colored bars) for ${dailyStats.length} days. Target is 70%+ time in range.`;
+  const description = `Weekly overview showing daily average glucose (blue line) and time in range percentage (colored bars) for ${dailyStats.length} days. Target is 70%+ time in range.`
 
-  return { spec, description };
+  return { spec, description }
 }
 
 /**
@@ -214,36 +210,36 @@ export function weeklyOverview(dailyStats: Array<{ date: string; avgGlucose: num
  */
 export function agpChart(readings: GlucoseReading[]): ChartData {
   // Group readings by time of day (5-minute buckets)
-  const buckets: Map<number, number[]> = new Map();
+  const buckets: Map<number, number[]> = new Map()
 
   for (const reading of readings) {
-    const date = new Date(reading.recordedAt);
-    const minutesFromMidnight = date.getHours() * 60 + date.getMinutes();
-    const bucket = Math.floor(minutesFromMidnight / 5) * 5; // 5-minute buckets
+    const date = new Date(reading.recordedAt)
+    const minutesFromMidnight = date.getHours() * 60 + date.getMinutes()
+    const bucket = Math.floor(minutesFromMidnight / 5) * 5 // 5-minute buckets
 
     if (!buckets.has(bucket)) {
-      buckets.set(bucket, []);
+      buckets.set(bucket, [])
     }
-    buckets.get(bucket)!.push(reading.value);
+    buckets.get(bucket)?.push(reading.value)
   }
 
   // Calculate percentiles for each bucket
   const agpData: Array<{
-    time: string;
-    median: number;
-    p25: number;
-    p75: number;
-    p10: number;
-    p90: number;
-  }> = [];
+    time: string
+    median: number
+    p25: number
+    p75: number
+    p10: number
+    p90: number
+  }> = []
 
   for (const [minutesFromMidnight, values] of buckets.entries()) {
-    if (values.length < 3) continue; // Skip buckets with too few readings
+    if (values.length < 3) continue // Skip buckets with too few readings
 
-    values.sort((a, b) => a - b);
-    const hours = Math.floor(minutesFromMidnight / 60);
-    const minutes = minutesFromMidnight % 60;
-    const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    values.sort((a, b) => a - b)
+    const hours = Math.floor(minutesFromMidnight / 60)
+    const minutes = minutesFromMidnight % 60
+    const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
 
     agpData.push({
       time: timeStr,
@@ -252,7 +248,7 @@ export function agpChart(readings: GlucoseReading[]): ChartData {
       p75: percentile(values, 75),
       p10: percentile(values, 10),
       p90: percentile(values, 90),
-    });
+    })
   }
 
   const spec = {
@@ -305,25 +301,25 @@ export function agpChart(readings: GlucoseReading[]): ChartData {
         },
       },
     ],
-  };
+  }
 
-  const description = `AGP chart showing glucose patterns by time of day over ${readings.length} readings. Dark blue line is median, shaded bands show 25th-75th percentile (darker) and 10th-90th percentile (lighter). Dashed green lines mark target range.`;
+  const description = `AGP chart showing glucose patterns by time of day over ${readings.length} readings. Dark blue line is median, shaded bands show 25th-75th percentile (darker) and 10th-90th percentile (lighter). Dashed green lines mark target range.`
 
-  return { spec, description };
+  return { spec, description }
 }
 
 /**
  * Calculate percentile from sorted array
  */
 function percentile(sortedValues: number[], p: number): number {
-  const index = (p / 100) * (sortedValues.length - 1);
-  const lower = Math.floor(index);
-  const upper = Math.ceil(index);
-  const weight = index - lower;
+  const index = (p / 100) * (sortedValues.length - 1)
+  const lower = Math.floor(index)
+  const upper = Math.ceil(index)
+  const weight = index - lower
 
   if (lower === upper) {
-    return sortedValues[lower];
+    return sortedValues[lower]
   }
 
-  return sortedValues[lower] * (1 - weight) + sortedValues[upper] * weight;
+  return sortedValues[lower] * (1 - weight) + sortedValues[upper] * weight
 }

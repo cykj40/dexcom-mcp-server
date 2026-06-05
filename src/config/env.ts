@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod'
 
 /**
  * Environment variable schema validation
@@ -34,7 +34,7 @@ const envSchema = z.object({
 
   // API environment
   DEXCOM_API_ENV: z.enum(['production', 'sandbox']).default('production'),
-});
+})
 
 /**
  * Validate and parse environment variables
@@ -42,17 +42,17 @@ const envSchema = z.object({
  */
 function validateEnv() {
   try {
-    return envSchema.parse(process.env);
+    return envSchema.parse(process.env)
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('❌ Environment validation failed:');
+      console.error('❌ Environment validation failed:')
       error.issues.forEach((issue) => {
-        console.error(`  - ${issue.path.join('.')}: ${issue.message}`);
-      });
-      console.error('\nPlease check your .env file or environment variables.');
-      process.exit(1);
+        console.error(`  - ${issue.path.join('.')}: ${issue.message}`)
+      })
+      console.error('\nPlease check your .env file or environment variables.')
+      process.exit(1)
     }
-    throw error;
+    throw error
   }
 }
 
@@ -60,7 +60,7 @@ function validateEnv() {
  * Validated environment configuration
  * All other files import from here — never access process.env directly
  */
-export const env = validateEnv();
+export const env = validateEnv()
 
 /**
  * Get the appropriate Dexcom API base URL based on environment
@@ -68,10 +68,10 @@ export const env = validateEnv();
 export function getDexcomApiBaseUrl(): string {
   return env.DEXCOM_API_ENV === 'sandbox'
     ? 'https://sandbox-api.dexcom.com'
-    : 'https://api.dexcom.com';
+    : 'https://api.dexcom.com'
 }
 
 /**
  * Dexcom Share API base URL (always production)
  */
-export const DEXCOM_SHARE_BASE_URL = 'https://share1.dexcom.com/ShareWebServices/Services';
+export const DEXCOM_SHARE_BASE_URL = 'https://share1.dexcom.com/ShareWebServices/Services'

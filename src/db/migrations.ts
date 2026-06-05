@@ -1,13 +1,13 @@
-import { getDb } from './database.js';
+import { getDb } from './database.js'
 
 /**
  * Run all database migrations
  * Creates tables and indexes on first run
  */
 export async function runMigrations(): Promise<void> {
-  const db = getDb();
+  const db = getDb()
 
-  console.error('Running database migrations...');
+  console.error('Running database migrations...')
 
   // Glucose readings table
   await db.execute(`
@@ -23,12 +23,12 @@ export async function runMigrations(): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(recorded_at, source)
     )
-  `);
+  `)
 
   await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_readings_recorded_at
     ON glucose_readings(recorded_at)
-  `);
+  `)
 
   // Insulin events table
   await db.execute(`
@@ -40,12 +40,12 @@ export async function runMigrations(): Promise<void> {
       notes TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
-  `);
+  `)
 
   await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_insulin_timestamp
     ON insulin_events(timestamp)
-  `);
+  `)
 
   // Carb events table
   await db.execute(`
@@ -59,12 +59,12 @@ export async function runMigrations(): Promise<void> {
       notes TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
-  `);
+  `)
 
   await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_carb_timestamp
     ON carb_events(timestamp)
-  `);
+  `)
 
   // Exercise events table
   await db.execute(`
@@ -77,12 +77,12 @@ export async function runMigrations(): Promise<void> {
       notes TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
-  `);
+  `)
 
   await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_exercise_timestamp
     ON exercise_events(timestamp)
-  `);
+  `)
 
   // Adaptive observations table
   await db.execute(`
@@ -97,12 +97,12 @@ export async function runMigrations(): Promise<void> {
       timestamp TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
-  `);
+  `)
 
   await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_observations_timestamp
     ON adaptive_observations(timestamp)
-  `);
+  `)
 
   // Token persistence table (for OAuth tokens across VM restarts)
   await db.execute(`
@@ -112,13 +112,13 @@ export async function runMigrations(): Promise<void> {
       expires_at TEXT,
       updated_at TEXT NOT NULL
     )
-  `);
+  `)
 
   try {
-    await db.execute('ALTER TABLE tokens ADD COLUMN expires_at TEXT');
+    await db.execute('ALTER TABLE tokens ADD COLUMN expires_at TEXT')
   } catch (error) {
     if (!(error instanceof Error) || !error.message.toLowerCase().includes('duplicate column')) {
-      throw error;
+      throw error
     }
   }
 
@@ -133,14 +133,14 @@ export async function runMigrations(): Promise<void> {
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       notes TEXT
     )
-  `);
+  `)
 
   await db.execute(`
     INSERT OR IGNORE INTO baseline_parameters (
       id, correction_factor, insulin_to_carb_ratio, basal_dose, basal_timing
     )
     VALUES (1, 30, 4, 30, 'morning')
-  `);
+  `)
 
-  console.error('✅ Migrations completed');
+  console.error('✅ Migrations completed')
 }

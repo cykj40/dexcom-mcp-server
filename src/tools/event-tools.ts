@@ -1,14 +1,14 @@
-import { z } from 'zod';
+import { z } from 'zod'
 import {
-  logInsulin,
+  getCarbEvents,
+  getEventsSummary,
+  getEventTimeline,
+  getExerciseEvents,
+  getInsulinEvents,
   logCarbs,
   logExercise,
-  getEventTimeline,
-  getEventsSummary,
-  getInsulinEvents,
-  getCarbEvents,
-  getExerciseEvents,
-} from '../services/events.service.js';
+  logInsulin,
+} from '../services/events.service.js'
 
 /**
  * Event MCP Tools
@@ -22,34 +22,31 @@ import {
 export const logInsulinTool = {
   name: 'log_insulin',
   description: 'Log an insulin dose',
-  inputSchema: z.object({
-    units: z.number().positive().describe('Number of insulin units'),
-    type: z
-      .enum(['rapid', 'long_acting', 'correction'])
-      .describe('Type of insulin dose'),
-    timestamp: z
-      .string()
-      .optional()
-      .describe('Timestamp in ISO 8601 format (defaults to now)'),
-    notes: z.string().optional().describe('Optional notes'),
-  }).strict(),
-};
+  inputSchema: z
+    .object({
+      units: z.number().positive().describe('Number of insulin units'),
+      type: z.enum(['rapid', 'long_acting', 'correction']).describe('Type of insulin dose'),
+      timestamp: z.string().optional().describe('Timestamp in ISO 8601 format (defaults to now)'),
+      notes: z.string().optional().describe('Optional notes'),
+    })
+    .strict(),
+}
 
 export async function logInsulinHandler(args: {
-  units: number;
-  type: 'rapid' | 'long_acting' | 'correction';
-  timestamp?: string;
-  notes?: string;
+  units: number
+  type: 'rapid' | 'long_acting' | 'correction'
+  timestamp?: string
+  notes?: string
 }) {
   try {
-    const timestamp = args.timestamp || new Date().toISOString();
+    const timestamp = args.timestamp ?? new Date().toISOString()
 
     const eventId = await logInsulin({
       units: args.units,
       type: args.type,
       timestamp,
       notes: args.notes,
-    });
+    })
 
     return {
       content: [
@@ -64,11 +61,11 @@ export async function logInsulinHandler(args: {
                 'This is an assistive recommendation based on your personal data. You are the final authority on any action taken.',
             },
             null,
-            2
+            2,
           ),
         },
       ],
-    };
+    }
   } catch (error) {
     return {
       content: [
@@ -78,7 +75,7 @@ export async function logInsulinHandler(args: {
         },
       ],
       isError: true,
-    };
+    }
   }
 }
 
@@ -89,30 +86,29 @@ export async function logInsulinHandler(args: {
 export const logCarbsTool = {
   name: 'log_carbs',
   description: 'Log a carbohydrate intake event',
-  inputSchema: z.object({
-    grams: z.number().positive().describe('Grams of carbohydrates'),
-    food_description: z.string().optional().describe('Description of food eaten'),
-    estimated_gi: z
-      .enum(['low', 'medium', 'high'])
-      .optional()
-      .describe('Estimated glycemic index'),
-    timestamp: z
-      .string()
-      .optional()
-      .describe('Timestamp in ISO 8601 format (defaults to now)'),
-    notes: z.string().optional().describe('Optional notes'),
-  }).strict(),
-};
+  inputSchema: z
+    .object({
+      grams: z.number().positive().describe('Grams of carbohydrates'),
+      food_description: z.string().optional().describe('Description of food eaten'),
+      estimated_gi: z
+        .enum(['low', 'medium', 'high'])
+        .optional()
+        .describe('Estimated glycemic index'),
+      timestamp: z.string().optional().describe('Timestamp in ISO 8601 format (defaults to now)'),
+      notes: z.string().optional().describe('Optional notes'),
+    })
+    .strict(),
+}
 
 export async function logCarbsHandler(args: {
-  grams: number;
-  food_description?: string;
-  estimated_gi?: 'low' | 'medium' | 'high';
-  timestamp?: string;
-  notes?: string;
+  grams: number
+  food_description?: string
+  estimated_gi?: 'low' | 'medium' | 'high'
+  timestamp?: string
+  notes?: string
 }) {
   try {
-    const timestamp = args.timestamp || new Date().toISOString();
+    const timestamp = args.timestamp ?? new Date().toISOString()
 
     const eventId = await logCarbs({
       grams: args.grams,
@@ -120,7 +116,7 @@ export async function logCarbsHandler(args: {
       estimatedGi: args.estimated_gi,
       timestamp,
       notes: args.notes,
-    });
+    })
 
     return {
       content: [
@@ -135,11 +131,11 @@ export async function logCarbsHandler(args: {
                 'These are assistive options based on your personal glucose history. You decide what, when, and how to eat.',
             },
             null,
-            2
+            2,
           ),
         },
       ],
-    };
+    }
   } catch (error) {
     return {
       content: [
@@ -149,7 +145,7 @@ export async function logCarbsHandler(args: {
         },
       ],
       isError: true,
-    };
+    }
   }
 }
 
@@ -160,30 +156,26 @@ export async function logCarbsHandler(args: {
 export const logExerciseTool = {
   name: 'log_exercise',
   description: 'Log an exercise or physical activity event',
-  inputSchema: z.object({
-    activity_type: z.string().describe('Type of activity (e.g., "running", "walking")'),
-    duration_minutes: z.number().positive().optional().describe('Duration in minutes'),
-    intensity: z
-      .enum(['low', 'moderate', 'high'])
-      .optional()
-      .describe('Exercise intensity'),
-    timestamp: z
-      .string()
-      .optional()
-      .describe('Timestamp in ISO 8601 format (defaults to now)'),
-    notes: z.string().optional().describe('Optional notes'),
-  }).strict(),
-};
+  inputSchema: z
+    .object({
+      activity_type: z.string().describe('Type of activity (e.g., "running", "walking")'),
+      duration_minutes: z.number().positive().optional().describe('Duration in minutes'),
+      intensity: z.enum(['low', 'moderate', 'high']).optional().describe('Exercise intensity'),
+      timestamp: z.string().optional().describe('Timestamp in ISO 8601 format (defaults to now)'),
+      notes: z.string().optional().describe('Optional notes'),
+    })
+    .strict(),
+}
 
 export async function logExerciseHandler(args: {
-  activity_type: string;
-  duration_minutes?: number;
-  intensity?: 'low' | 'moderate' | 'high';
-  timestamp?: string;
-  notes?: string;
+  activity_type: string
+  duration_minutes?: number
+  intensity?: 'low' | 'moderate' | 'high'
+  timestamp?: string
+  notes?: string
 }) {
   try {
-    const timestamp = args.timestamp || new Date().toISOString();
+    const timestamp = args.timestamp ?? new Date().toISOString()
 
     const eventId = await logExercise({
       activityType: args.activity_type,
@@ -191,7 +183,7 @@ export async function logExerciseHandler(args: {
       intensity: args.intensity,
       timestamp,
       notes: args.notes,
-    });
+    })
 
     return {
       content: [
@@ -204,11 +196,11 @@ export async function logExerciseHandler(args: {
               message: `Logged ${args.activity_type} exercise at ${timestamp}`,
             },
             null,
-            2
+            2,
           ),
         },
       ],
-    };
+    }
   } catch (error) {
     return {
       content: [
@@ -218,7 +210,7 @@ export async function logExerciseHandler(args: {
         },
       ],
       isError: true,
-    };
+    }
   }
 }
 
@@ -228,20 +220,20 @@ export async function logExerciseHandler(args: {
 
 export const getEventTimelineTool = {
   name: 'get_event_timeline',
-  description: 'Get a chronological timeline of all logged events (insulin, carbs, exercise) with glucose context',
-  inputSchema: z.object({
-    start_time: z.string().describe('Start time in ISO 8601 format'),
-    end_time: z.string().describe('End time in ISO 8601 format'),
-  }).strict(),
-};
+  description:
+    'Get a chronological timeline of all logged events (insulin, carbs, exercise) with glucose context',
+  inputSchema: z
+    .object({
+      start_time: z.string().describe('Start time in ISO 8601 format'),
+      end_time: z.string().describe('End time in ISO 8601 format'),
+    })
+    .strict(),
+}
 
-export async function getEventTimelineHandler(args: {
-  start_time: string;
-  end_time: string;
-}) {
+export async function getEventTimelineHandler(args: { start_time: string; end_time: string }) {
   try {
-    const timeline = await getEventTimeline(args.start_time, args.end_time, true);
-    const summary = await getEventsSummary(args.start_time, args.end_time);
+    const timeline = await getEventTimeline(args.start_time, args.end_time, true)
+    const summary = await getEventsSummary(args.start_time, args.end_time)
 
     return {
       content: [
@@ -272,11 +264,11 @@ export async function getEventTimelineHandler(args: {
               })),
             },
             null,
-            2
+            2,
           ),
         },
       ],
-    };
+    }
   } catch (error) {
     return {
       content: [
@@ -286,7 +278,7 @@ export async function getEventTimelineHandler(args: {
         },
       ],
       isError: true,
-    };
+    }
   }
 }
 
@@ -297,18 +289,17 @@ export async function getEventTimelineHandler(args: {
 export const getInsulinEventsTool = {
   name: 'get_insulin_events',
   description: 'Get all insulin events within a date range',
-  inputSchema: z.object({
-    start_time: z.string().describe('Start time in ISO 8601 format'),
-    end_time: z.string().describe('End time in ISO 8601 format'),
-  }).strict(),
-};
+  inputSchema: z
+    .object({
+      start_time: z.string().describe('Start time in ISO 8601 format'),
+      end_time: z.string().describe('End time in ISO 8601 format'),
+    })
+    .strict(),
+}
 
-export async function getInsulinEventsHandler(args: {
-  start_time: string;
-  end_time: string;
-}) {
+export async function getInsulinEventsHandler(args: { start_time: string; end_time: string }) {
   try {
-    const events = await getInsulinEvents(args.start_time, args.end_time);
+    const events = await getInsulinEvents(args.start_time, args.end_time)
 
     return {
       content: [
@@ -331,11 +322,11 @@ export async function getInsulinEventsHandler(args: {
               })),
             },
             null,
-            2
+            2,
           ),
         },
       ],
-    };
+    }
   } catch (error) {
     return {
       content: [
@@ -345,7 +336,7 @@ export async function getInsulinEventsHandler(args: {
         },
       ],
       isError: true,
-    };
+    }
   }
 }
 
@@ -356,18 +347,17 @@ export async function getInsulinEventsHandler(args: {
 export const getCarbEventsTool = {
   name: 'get_carb_events',
   description: 'Get all carbohydrate intake events within a date range',
-  inputSchema: z.object({
-    start_time: z.string().describe('Start time in ISO 8601 format'),
-    end_time: z.string().describe('End time in ISO 8601 format'),
-  }).strict(),
-};
+  inputSchema: z
+    .object({
+      start_time: z.string().describe('Start time in ISO 8601 format'),
+      end_time: z.string().describe('End time in ISO 8601 format'),
+    })
+    .strict(),
+}
 
-export async function getCarbEventsHandler(args: {
-  start_time: string;
-  end_time: string;
-}) {
+export async function getCarbEventsHandler(args: { start_time: string; end_time: string }) {
   try {
-    const events = await getCarbEvents(args.start_time, args.end_time);
+    const events = await getCarbEvents(args.start_time, args.end_time)
 
     return {
       content: [
@@ -393,11 +383,11 @@ export async function getCarbEventsHandler(args: {
                 'These are assistive options based on your personal glucose history. You decide what, when, and how to eat.',
             },
             null,
-            2
+            2,
           ),
         },
       ],
-    };
+    }
   } catch (error) {
     return {
       content: [
@@ -407,7 +397,7 @@ export async function getCarbEventsHandler(args: {
         },
       ],
       isError: true,
-    };
+    }
   }
 }
 
@@ -418,18 +408,17 @@ export async function getCarbEventsHandler(args: {
 export const getExerciseEventsTool = {
   name: 'get_exercise_events',
   description: 'Get all exercise/physical activity events within a date range',
-  inputSchema: z.object({
-    start_time: z.string().describe('Start time in ISO 8601 format'),
-    end_time: z.string().describe('End time in ISO 8601 format'),
-  }).strict(),
-};
+  inputSchema: z
+    .object({
+      start_time: z.string().describe('Start time in ISO 8601 format'),
+      end_time: z.string().describe('End time in ISO 8601 format'),
+    })
+    .strict(),
+}
 
-export async function getExerciseEventsHandler(args: {
-  start_time: string;
-  end_time: string;
-}) {
+export async function getExerciseEventsHandler(args: { start_time: string; end_time: string }) {
   try {
-    const events = await getExerciseEvents(args.start_time, args.end_time);
+    const events = await getExerciseEvents(args.start_time, args.end_time)
 
     return {
       content: [
@@ -452,11 +441,11 @@ export async function getExerciseEventsHandler(args: {
               })),
             },
             null,
-            2
+            2,
           ),
         },
       ],
-    };
+    }
   } catch (error) {
     return {
       content: [
@@ -466,6 +455,6 @@ export async function getExerciseEventsHandler(args: {
         },
       ],
       isError: true,
-    };
+    }
   }
 }

@@ -1,5 +1,10 @@
-import { z } from 'zod';
-import { getLatestReading, getReadings, getDailySummary, calculateStatistics } from '../services/glucose.service.js';
+import { z } from 'zod'
+import {
+  calculateStatistics,
+  getDailySummary,
+  getLatestReading,
+  getReadings,
+} from '../services/glucose.service.js'
 
 /**
  * Glucose MCP Tools
@@ -14,10 +19,10 @@ export const getLatestGlucoseTool = {
   name: 'get_latest_glucose',
   description: 'Get the current glucose reading with trend information',
   inputSchema: z.object({}).strict(),
-};
+}
 
 export async function getLatestGlucoseHandler() {
-  const reading = await getLatestReading();
+  const reading = await getLatestReading()
 
   if (!reading) {
     return {
@@ -27,12 +32,10 @@ export async function getLatestGlucoseHandler() {
           text: 'No glucose readings available. Please ensure your Dexcom device is connected and transmitting data.',
         },
       ],
-    };
+    }
   }
 
-  const ageMinutes = Math.floor(
-    (Date.now() - new Date(reading.recordedAt).getTime()) / 1000 / 60
-  );
+  const ageMinutes = Math.floor((Date.now() - new Date(reading.recordedAt).getTime()) / 1000 / 60)
 
   return {
     content: [
@@ -49,11 +52,11 @@ export async function getLatestGlucoseHandler() {
             source: reading.source,
           },
           null,
-          2
+          2,
         ),
       },
     ],
-  };
+  }
 }
 
 // ============================================================================
@@ -63,18 +66,17 @@ export async function getLatestGlucoseHandler() {
 export const getGlucoseRangeTool = {
   name: 'get_glucose_range',
   description: 'Get glucose readings within a time range',
-  inputSchema: z.object({
-    start_time: z.string().describe('Start time in ISO 8601 format'),
-    end_time: z.string().describe('End time in ISO 8601 format'),
-  }).strict(),
-};
+  inputSchema: z
+    .object({
+      start_time: z.string().describe('Start time in ISO 8601 format'),
+      end_time: z.string().describe('End time in ISO 8601 format'),
+    })
+    .strict(),
+}
 
-export async function getGlucoseRangeHandler(args: {
-  start_time: string;
-  end_time: string;
-}) {
+export async function getGlucoseRangeHandler(args: { start_time: string; end_time: string }) {
   try {
-    const readings = await getReadings(args.start_time, args.end_time);
+    const readings = await getReadings(args.start_time, args.end_time)
 
     if (readings.length === 0) {
       return {
@@ -84,10 +86,10 @@ export async function getGlucoseRangeHandler(args: {
             text: `No glucose readings found between ${args.start_time} and ${args.end_time}`,
           },
         ],
-      };
+      }
     }
 
-    const stats = calculateStatistics(readings);
+    const stats = calculateStatistics(readings)
 
     return {
       content: [
@@ -108,11 +110,11 @@ export async function getGlucoseRangeHandler(args: {
               })),
             },
             null,
-            2
+            2,
           ),
         },
       ],
-    };
+    }
   } catch (error) {
     return {
       content: [
@@ -122,7 +124,7 @@ export async function getGlucoseRangeHandler(args: {
         },
       ],
       isError: true,
-    };
+    }
   }
 }
 
@@ -133,18 +135,17 @@ export async function getGlucoseRangeHandler(args: {
 export const getDailySummaryTool = {
   name: 'get_daily_summary',
   description: 'Get glucose summary for a specific day',
-  inputSchema: z.object({
-    date: z
-      .string()
-      .optional()
-      .describe('Date in YYYY-MM-DD format (defaults to today)'),
-  }).strict(),
-};
+  inputSchema: z
+    .object({
+      date: z.string().optional().describe('Date in YYYY-MM-DD format (defaults to today)'),
+    })
+    .strict(),
+}
 
 export async function getDailySummaryHandler(args: { date?: string }) {
   try {
-    const date = args.date || new Date().toISOString().split('T')[0];
-    const summary = await getDailySummary(date);
+    const date = args.date ?? new Date().toISOString().split('T')[0]
+    const summary = await getDailySummary(date)
 
     return {
       content: [
@@ -157,11 +158,11 @@ export async function getDailySummaryHandler(args: { date?: string }) {
               readingCount: summary.readings.length,
             },
             null,
-            2
+            2,
           ),
         },
       ],
-    };
+    }
   } catch (error) {
     return {
       content: [
@@ -171,7 +172,7 @@ export async function getDailySummaryHandler(args: { date?: string }) {
         },
       ],
       isError: true,
-    };
+    }
   }
 }
 
@@ -182,23 +183,21 @@ export async function getDailySummaryHandler(args: { date?: string }) {
 export const getGlucoseStatisticsTool = {
   name: 'get_glucose_statistics',
   description: 'Get comprehensive glucose statistics for a time period',
-  inputSchema: z.object({
-    hours: z
-      .number()
-      .positive()
-      .default(24)
-      .describe('Number of hours to analyze (default: 24)'),
-  }).strict(),
-};
+  inputSchema: z
+    .object({
+      hours: z.number().positive().default(24).describe('Number of hours to analyze (default: 24)'),
+    })
+    .strict(),
+}
 
 export async function getGlucoseStatisticsHandler(args: { hours?: number }) {
   try {
-    const hours = args.hours || 24;
-    const endTime = new Date();
-    const startTime = new Date(endTime.getTime() - hours * 60 * 60 * 1000);
+    const hours = args.hours ?? 24
+    const endTime = new Date()
+    const startTime = new Date(endTime.getTime() - hours * 60 * 60 * 1000)
 
-    const readings = await getReadings(startTime.toISOString(), endTime.toISOString());
-    const stats = calculateStatistics(readings);
+    const readings = await getReadings(startTime.toISOString(), endTime.toISOString())
+    const stats = calculateStatistics(readings)
 
     return {
       content: [
@@ -214,11 +213,11 @@ export async function getGlucoseStatisticsHandler(args: { hours?: number }) {
               statistics: stats,
             },
             null,
-            2
+            2,
           ),
         },
       ],
-    };
+    }
   } catch (error) {
     return {
       content: [
@@ -228,6 +227,6 @@ export async function getGlucoseStatisticsHandler(args: { hours?: number }) {
         },
       ],
       isError: true,
-    };
+    }
   }
 }

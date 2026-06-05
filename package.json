@@ -13,6 +13,9 @@
     "start": "node dist/index.js",
     "oauth": "tsx src/oauth-helper.ts",
     "oauth:manual": "tsx src/manual-oauth.ts",
+    "lint": "biome check src",
+    "lint:fix": "biome check --write src",
+    "format": "biome format --write src",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -44,6 +47,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.16",
     "@types/express": "^5.0.6",
     "@types/node": "^25.1.0",
     "@vitest/ui": "^4.0.18",
