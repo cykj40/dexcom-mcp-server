@@ -1,41 +1,43 @@
-import { getDb } from './database.js';
-import type { Value } from '@libsql/client';
+import type { Value } from '@libsql/client'
 import type {
-  GlucoseReading,
-  InsulinEvent,
-  CarbEvent,
-  ExerciseEvent,
   AdaptiveObservation,
   BaselineParameters,
-} from '../types/index.js';
-import { BASELINE_DEFAULTS } from '../types/index.js';
+  CarbEvent,
+  ExerciseEvent,
+  GlucoseReading,
+  InsulinEvent,
+} from '../types/index.js'
+import { BASELINE_DEFAULTS } from '../types/index.js'
+import { getDb } from './database.js'
 
 // ============================================================================
 // Row helpers
 // ============================================================================
 
 function str(v: Value): string {
-  return v != null ? String(v) : '';
+  return v != null ? String(v) : ''
 }
 
 function num(v: Value): number {
-  return Number(v);
+  return Number(v)
 }
 
 function optStr(v: Value): string | undefined {
-  return v != null ? String(v) : undefined;
+  return v != null ? String(v) : undefined
 }
 
 function optNum(v: Value): number | undefined {
-  return v != null ? Number(v) : undefined;
+  return v != null ? Number(v) : undefined
 }
 
 // ============================================================================
 // Baseline Parameter Queries
 // ============================================================================
 
-export async function getBaselineParameters(): Promise<BaselineParameters & { updatedAt: string; notes?: string }> {
-  const db = getDb();
+export async function getBaselineParameters(): Promise<
+  BaselineParameters & { updatedAt: string; notes?: string }
+> {
+  const db = getDb()
   const result = await db.execute({
     sql: `
       SELECT
@@ -49,64 +51,66 @@ export async function getBaselineParameters(): Promise<BaselineParameters & { up
       WHERE id = 1
     `,
     args: [],
-  });
+  })
 
   if (result.rows.length === 0) {
-    console.error('Baseline parameters row missing; using hardcoded defaults as fallback');
+    console.error('Baseline parameters row missing; using hardcoded defaults as fallback')
     return {
       ...BASELINE_DEFAULTS,
       updatedAt: new Date().toISOString(),
-    };
+    }
   }
 
-  const row = result.rows[0];
+  const row = result.rows[0]
   return {
-    correctionFactor: num(row['correctionFactor']),
-    insulinToCarbRatio: num(row['insulinToCarbRatio']),
-    basalDose: num(row['basalDose']),
-    basalTiming: str(row['basalTiming']),
-    updatedAt: str(row['updatedAt']),
-    notes: optStr(row['notes']),
-  };
+    correctionFactor: num(row.correctionFactor),
+    insulinToCarbRatio: num(row.insulinToCarbRatio),
+    basalDose: num(row.basalDose),
+    basalTiming: str(row.basalTiming),
+    updatedAt: str(row.updatedAt),
+    notes: optStr(row.notes),
+  }
 }
 
-export async function updateBaselineParameters(params: Partial<{
-  correctionFactor: number;
-  insulinToCarbRatio: number;
-  basalDose: number;
-  basalTiming: string;
-  notes: string;
-}>): Promise<void> {
-  const db = getDb();
-  const updates: string[] = [];
-  const args: Value[] = [];
+export async function updateBaselineParameters(
+  params: Partial<{
+    correctionFactor: number
+    insulinToCarbRatio: number
+    basalDose: number
+    basalTiming: string
+    notes: string
+  }>,
+): Promise<void> {
+  const db = getDb()
+  const updates: string[] = []
+  const args: Value[] = []
 
   if (params.correctionFactor !== undefined) {
-    updates.push('correction_factor = ?');
-    args.push(params.correctionFactor);
+    updates.push('correction_factor = ?')
+    args.push(params.correctionFactor)
   }
 
   if (params.insulinToCarbRatio !== undefined) {
-    updates.push('insulin_to_carb_ratio = ?');
-    args.push(params.insulinToCarbRatio);
+    updates.push('insulin_to_carb_ratio = ?')
+    args.push(params.insulinToCarbRatio)
   }
 
   if (params.basalDose !== undefined) {
-    updates.push('basal_dose = ?');
-    args.push(params.basalDose);
+    updates.push('basal_dose = ?')
+    args.push(params.basalDose)
   }
 
   if (params.basalTiming !== undefined) {
-    updates.push('basal_timing = ?');
-    args.push(params.basalTiming);
+    updates.push('basal_timing = ?')
+    args.push(params.basalTiming)
   }
 
   if (params.notes !== undefined) {
-    updates.push('notes = ?');
-    args.push(params.notes);
+    updates.push('notes = ?')
+    args.push(params.notes)
   }
 
-  updates.push("updated_at = datetime('now')");
+  updates.push("updated_at = datetime('now')")
 
   await db.execute({
     sql: `
@@ -115,7 +119,7 @@ export async function updateBaselineParameters(params: Partial<{
       WHERE id = 1
     `,
     args,
-  });
+  })
 }
 
 // ============================================================================
@@ -126,7 +130,7 @@ export async function updateBaselineParameters(params: Partial<{
  * Insert or update a glucose reading (upsert on recorded_at + source)
  */
 export async function insertGlucoseReading(reading: GlucoseReading): Promise<void> {
-  const db = getDb();
+  const db = getDb()
   await db.execute({
     sql: `
       INSERT INTO glucose_readings (
@@ -148,14 +152,17 @@ export async function insertGlucoseReading(reading: GlucoseReading): Promise<voi
       reading.systemTime ?? reading.recordedAt,
       reading.displayTime ?? reading.recordedAt,
     ],
-  });
+  })
 }
 
 /**
  * Get glucose readings within a date range
  */
-export async function getReadingsInRange(startDate: string, endDate: string): Promise<GlucoseReading[]> {
-  const db = getDb();
+export async function getReadingsInRange(
+  startDate: string,
+  endDate: string,
+): Promise<GlucoseReading[]> {
+  const db = getDb()
   const result = await db.execute({
     sql: `
       SELECT
@@ -171,24 +178,24 @@ export async function getReadingsInRange(startDate: string, endDate: string): Pr
       ORDER BY recorded_at ASC
     `,
     args: [startDate, endDate],
-  });
+  })
 
   return result.rows.map((row) => ({
-    value: num(row['value']),
-    trend: str(row['trend']),
-    trendDescription: str(row['trendDescription']),
-    recordedAt: str(row['recordedAt']),
-    source: str(row['source']) as 'api' | 'share',
-    systemTime: optStr(row['systemTime']),
-    displayTime: optStr(row['displayTime']),
-  }));
+    value: num(row.value),
+    trend: str(row.trend),
+    trendDescription: str(row.trendDescription),
+    recordedAt: str(row.recordedAt),
+    source: str(row.source) as 'api' | 'share',
+    systemTime: optStr(row.systemTime),
+    displayTime: optStr(row.displayTime),
+  }))
 }
 
 /**
  * Get the most recent glucose reading
  */
 export async function getLatestReading(): Promise<GlucoseReading | null> {
-  const db = getDb();
+  const db = getDb()
   const result = await db.execute({
     sql: `
       SELECT
@@ -204,31 +211,31 @@ export async function getLatestReading(): Promise<GlucoseReading | null> {
       LIMIT 1
     `,
     args: [],
-  });
+  })
 
-  if (result.rows.length === 0) return null;
-  const row = result.rows[0];
+  if (result.rows.length === 0) return null
+  const row = result.rows[0]
   return {
-    value: num(row['value']),
-    trend: str(row['trend']),
-    trendDescription: str(row['trendDescription']),
-    recordedAt: str(row['recordedAt']),
-    source: str(row['source']) as 'api' | 'share',
-    systemTime: optStr(row['systemTime']),
-    displayTime: optStr(row['displayTime']),
-  };
+    value: num(row.value),
+    trend: str(row.trend),
+    trendDescription: str(row.trendDescription),
+    recordedAt: str(row.recordedAt),
+    source: str(row.source) as 'api' | 'share',
+    systemTime: optStr(row.systemTime),
+    displayTime: optStr(row.displayTime),
+  }
 }
 
 /**
  * Get reading count in date range
  */
 export async function getReadingCount(startDate: string, endDate: string): Promise<number> {
-  const db = getDb();
+  const db = getDb()
   const result = await db.execute({
     sql: `SELECT COUNT(*) as count FROM glucose_readings WHERE recorded_at >= ? AND recorded_at <= ?`,
     args: [startDate, endDate],
-  });
-  return num(result.rows[0]?.['count'] ?? 0);
+  })
+  return num(result.rows[0]?.count ?? 0)
 }
 
 // ============================================================================
@@ -239,19 +246,22 @@ export async function getReadingCount(startDate: string, endDate: string): Promi
  * Insert an insulin event
  */
 export async function insertInsulinEvent(event: InsulinEvent): Promise<number> {
-  const db = getDb();
+  const db = getDb()
   const result = await db.execute({
     sql: `INSERT INTO insulin_events (units, type, timestamp, notes) VALUES (?, ?, ?, ?)`,
     args: [event.units, event.type, event.timestamp, event.notes ?? null],
-  });
-  return Number(result.lastInsertRowid);
+  })
+  return Number(result.lastInsertRowid)
 }
 
 /**
  * Get insulin events within a date range
  */
-export async function getInsulinEvents(startDate: string, endDate: string): Promise<InsulinEvent[]> {
-  const db = getDb();
+export async function getInsulinEvents(
+  startDate: string,
+  endDate: string,
+): Promise<InsulinEvent[]> {
+  const db = getDb()
   const result = await db.execute({
     sql: `
       SELECT id, units, type, timestamp, notes, created_at as createdAt
@@ -260,16 +270,16 @@ export async function getInsulinEvents(startDate: string, endDate: string): Prom
       ORDER BY timestamp ASC
     `,
     args: [startDate, endDate],
-  });
+  })
 
   return result.rows.map((row) => ({
-    id: optNum(row['id']),
-    units: num(row['units']),
-    type: str(row['type']) as 'rapid' | 'long_acting' | 'correction',
-    timestamp: str(row['timestamp']),
-    notes: optStr(row['notes']),
-    createdAt: optStr(row['createdAt']),
-  }));
+    id: optNum(row.id),
+    units: num(row.units),
+    type: str(row.type) as 'rapid' | 'long_acting' | 'correction',
+    timestamp: str(row.timestamp),
+    notes: optStr(row.notes),
+    createdAt: optStr(row.createdAt),
+  }))
 }
 
 // ============================================================================
@@ -280,7 +290,7 @@ export async function getInsulinEvents(startDate: string, endDate: string): Prom
  * Insert a carb event
  */
 export async function insertCarbEvent(event: CarbEvent): Promise<number> {
-  const db = getDb();
+  const db = getDb()
   const result = await db.execute({
     sql: `
       INSERT INTO carb_events (grams, food_description, estimated_gi, confidence, timestamp, notes)
@@ -294,15 +304,15 @@ export async function insertCarbEvent(event: CarbEvent): Promise<number> {
       event.timestamp,
       event.notes ?? null,
     ],
-  });
-  return Number(result.lastInsertRowid);
+  })
+  return Number(result.lastInsertRowid)
 }
 
 /**
  * Get carb events within a date range
  */
 export async function getCarbEvents(startDate: string, endDate: string): Promise<CarbEvent[]> {
-  const db = getDb();
+  const db = getDb()
   const result = await db.execute({
     sql: `
       SELECT
@@ -319,18 +329,18 @@ export async function getCarbEvents(startDate: string, endDate: string): Promise
       ORDER BY timestamp ASC
     `,
     args: [startDate, endDate],
-  });
+  })
 
   return result.rows.map((row) => ({
-    id: optNum(row['id']),
-    grams: num(row['grams']),
-    foodDescription: optStr(row['foodDescription']),
-    estimatedGi: optStr(row['estimatedGi']) as 'low' | 'medium' | 'high' | undefined,
-    confidence: optStr(row['confidence']) as 'low' | 'medium' | 'high' | undefined,
-    timestamp: str(row['timestamp']),
-    notes: optStr(row['notes']),
-    createdAt: optStr(row['createdAt']),
-  }));
+    id: optNum(row.id),
+    grams: num(row.grams),
+    foodDescription: optStr(row.foodDescription),
+    estimatedGi: optStr(row.estimatedGi) as 'low' | 'medium' | 'high' | undefined,
+    confidence: optStr(row.confidence) as 'low' | 'medium' | 'high' | undefined,
+    timestamp: str(row.timestamp),
+    notes: optStr(row.notes),
+    createdAt: optStr(row.createdAt),
+  }))
 }
 
 // ============================================================================
@@ -341,7 +351,7 @@ export async function getCarbEvents(startDate: string, endDate: string): Promise
  * Insert an exercise event
  */
 export async function insertExerciseEvent(event: ExerciseEvent): Promise<number> {
-  const db = getDb();
+  const db = getDb()
   const result = await db.execute({
     sql: `
       INSERT INTO exercise_events (activity_type, duration_minutes, intensity, timestamp, notes)
@@ -354,15 +364,18 @@ export async function insertExerciseEvent(event: ExerciseEvent): Promise<number>
       event.timestamp,
       event.notes ?? null,
     ],
-  });
-  return Number(result.lastInsertRowid);
+  })
+  return Number(result.lastInsertRowid)
 }
 
 /**
  * Get exercise events within a date range
  */
-export async function getExerciseEvents(startDate: string, endDate: string): Promise<ExerciseEvent[]> {
-  const db = getDb();
+export async function getExerciseEvents(
+  startDate: string,
+  endDate: string,
+): Promise<ExerciseEvent[]> {
+  const db = getDb()
   const result = await db.execute({
     sql: `
       SELECT
@@ -378,17 +391,17 @@ export async function getExerciseEvents(startDate: string, endDate: string): Pro
       ORDER BY timestamp ASC
     `,
     args: [startDate, endDate],
-  });
+  })
 
   return result.rows.map((row) => ({
-    id: optNum(row['id']),
-    activityType: str(row['activityType']),
-    durationMinutes: optNum(row['durationMinutes']),
-    intensity: optStr(row['intensity']) as 'low' | 'moderate' | 'high' | undefined,
-    timestamp: str(row['timestamp']),
-    notes: optStr(row['notes']),
-    createdAt: optStr(row['createdAt']),
-  }));
+    id: optNum(row.id),
+    activityType: str(row.activityType),
+    durationMinutes: optNum(row.durationMinutes),
+    intensity: optStr(row.intensity) as 'low' | 'moderate' | 'high' | undefined,
+    timestamp: str(row.timestamp),
+    notes: optStr(row.notes),
+    createdAt: optStr(row.createdAt),
+  }))
 }
 
 // ============================================================================
@@ -399,7 +412,7 @@ export async function getExerciseEvents(startDate: string, endDate: string): Pro
  * Insert an adaptive observation
  */
 export async function insertAdaptiveObservation(obs: AdaptiveObservation): Promise<number> {
-  const db = getDb();
+  const db = getDb()
   const result = await db.execute({
     sql: `
       INSERT INTO adaptive_observations (
@@ -416,15 +429,15 @@ export async function insertAdaptiveObservation(obs: AdaptiveObservation): Promi
       obs.hypothesis,
       obs.timestamp,
     ],
-  });
-  return Number(result.lastInsertRowid);
+  })
+  return Number(result.lastInsertRowid)
 }
 
 /**
  * Get recent adaptive observations
  */
 export async function getRecentObservations(days: number): Promise<AdaptiveObservation[]> {
-  const db = getDb();
+  const db = getDb()
   const result = await db.execute({
     sql: `
       SELECT
@@ -442,26 +455,29 @@ export async function getRecentObservations(days: number): Promise<AdaptiveObser
       ORDER BY timestamp DESC
     `,
     args: [days],
-  });
+  })
 
   return result.rows.map((row) => ({
-    id: optNum(row['id']),
-    observationType: str(row['observationType']),
-    expectedValue: num(row['expectedValue']),
-    actualValue: num(row['actualValue']),
-    deviationPct: num(row['deviationPct']),
-    context: JSON.parse(str(row['context']) || '{}') as Record<string, unknown>,
-    hypothesis: str(row['hypothesis']),
-    timestamp: str(row['timestamp']),
-    createdAt: optStr(row['createdAt']),
-  }));
+    id: optNum(row.id),
+    observationType: str(row.observationType),
+    expectedValue: num(row.expectedValue),
+    actualValue: num(row.actualValue),
+    deviationPct: num(row.deviationPct),
+    context: JSON.parse(str(row.context) || '{}') as Record<string, unknown>,
+    hypothesis: str(row.hypothesis),
+    timestamp: str(row.timestamp),
+    createdAt: optStr(row.createdAt),
+  }))
 }
 
 /**
  * Get observations by type
  */
-export async function getObservationsByType(type: string, days: number): Promise<AdaptiveObservation[]> {
-  const db = getDb();
+export async function getObservationsByType(
+  type: string,
+  days: number,
+): Promise<AdaptiveObservation[]> {
+  const db = getDb()
   const result = await db.execute({
     sql: `
       SELECT
@@ -480,17 +496,17 @@ export async function getObservationsByType(type: string, days: number): Promise
       ORDER BY timestamp DESC
     `,
     args: [type, days],
-  });
+  })
 
   return result.rows.map((row) => ({
-    id: optNum(row['id']),
-    observationType: str(row['observationType']),
-    expectedValue: num(row['expectedValue']),
-    actualValue: num(row['actualValue']),
-    deviationPct: num(row['deviationPct']),
-    context: JSON.parse(str(row['context']) || '{}') as Record<string, unknown>,
-    hypothesis: str(row['hypothesis']),
-    timestamp: str(row['timestamp']),
-    createdAt: optStr(row['createdAt']),
-  }));
+    id: optNum(row.id),
+    observationType: str(row.observationType),
+    expectedValue: num(row.expectedValue),
+    actualValue: num(row.actualValue),
+    deviationPct: num(row.deviationPct),
+    context: JSON.parse(str(row.context) || '{}') as Record<string, unknown>,
+    hypothesis: str(row.hypothesis),
+    timestamp: str(row.timestamp),
+    createdAt: optStr(row.createdAt),
+  }))
 }

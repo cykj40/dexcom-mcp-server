@@ -1,7 +1,7 @@
-import { createClient, type Client } from '@libsql/client';
-import { env } from '../config/env.js';
+import { type Client, createClient } from '@libsql/client'
+import { env } from '../config/env.js'
 
-let client: Client | null = null;
+let client: Client | null = null
 
 /**
  * Get or create libsql (Turso) database client
@@ -12,10 +12,10 @@ export function getDb(): Client {
     client = createClient({
       url: env.TURSO_DATABASE_URL,
       authToken: env.TURSO_AUTH_TOKEN,
-    });
-    console.error(`✅ Database connected: ${env.TURSO_DATABASE_URL}`);
+    })
+    console.error(`✅ Database connected: ${env.TURSO_DATABASE_URL}`)
   }
-  return client;
+  return client
 }
 
 /**
@@ -24,8 +24,8 @@ export function getDb(): Client {
  */
 export function closeDb(): void {
   if (client) {
-    client.close();
-    client = null;
-    console.error('Database connection closed');
+    client.close()
+    client = null
+    console.error('Database connection closed')
   }
 }

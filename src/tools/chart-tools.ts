@@ -1,7 +1,12 @@
-import { z } from 'zod';
-import { getReadings, getDailySummary, calculateStatistics } from '../services/glucose.service.js';
-import { getEventTimeline } from '../services/events.service.js';
-import { glucoseTimeSeries, dailySummaryChart, weeklyOverview, agpChart } from '../services/chart.service.js';
+import { z } from 'zod'
+import {
+  agpChart,
+  dailySummaryChart,
+  glucoseTimeSeries,
+  weeklyOverview,
+} from '../services/chart.service.js'
+import { getEventTimeline } from '../services/events.service.js'
+import { getDailySummary, getReadings } from '../services/glucose.service.js'
 
 /**
  * Chart MCP Tools
@@ -15,43 +20,39 @@ import { glucoseTimeSeries, dailySummaryChart, weeklyOverview, agpChart } from '
 export const generateChartTool = {
   name: 'generate_chart',
   description: 'Generate a glucose visualization chart (timeline, daily, weekly, or AGP)',
-  inputSchema: z.object({
-    chart_type: z
-      .enum(['timeline', 'daily', 'weekly', 'agp'])
-      .describe('Type of chart to generate'),
-    start_date: z
-      .string()
-      .optional()
-      .describe('Start date in ISO 8601 format (required for timeline and weekly)'),
-    end_date: z
-      .string()
-      .optional()
-      .describe('End date in ISO 8601 format (required for timeline and weekly)'),
-    date: z
-      .string()
-      .optional()
-      .describe('Specific date for daily chart (YYYY-MM-DD format)'),
-    include_events: z
-      .boolean()
-      .default(true)
-      .describe('Include insulin/carb/exercise event markers'),
-    days: z
-      .number()
-      .optional()
-      .describe('Number of days for AGP chart (default: 14)'),
-  }).strict(),
-};
+  inputSchema: z
+    .object({
+      chart_type: z
+        .enum(['timeline', 'daily', 'weekly', 'agp'])
+        .describe('Type of chart to generate'),
+      start_date: z
+        .string()
+        .optional()
+        .describe('Start date in ISO 8601 format (required for timeline and weekly)'),
+      end_date: z
+        .string()
+        .optional()
+        .describe('End date in ISO 8601 format (required for timeline and weekly)'),
+      date: z.string().optional().describe('Specific date for daily chart (YYYY-MM-DD format)'),
+      include_events: z
+        .boolean()
+        .default(true)
+        .describe('Include insulin/carb/exercise event markers'),
+      days: z.number().optional().describe('Number of days for AGP chart (default: 14)'),
+    })
+    .strict(),
+}
 
 export async function generateChartHandler(args: {
-  chart_type: 'timeline' | 'daily' | 'weekly' | 'agp';
-  start_date?: string;
-  end_date?: string;
-  date?: string;
-  include_events?: boolean;
-  days?: number;
+  chart_type: 'timeline' | 'daily' | 'weekly' | 'agp'
+  start_date?: string
+  end_date?: string
+  date?: string
+  include_events?: boolean
+  days?: number
 }) {
   try {
-    const includeEvents = args.include_events !== false;
+    const includeEvents = args.include_events !== false
 
     switch (args.chart_type) {
       case 'timeline': {
@@ -64,15 +65,15 @@ export async function generateChartHandler(args: {
               },
             ],
             isError: true,
-          };
+          }
         }
 
-        const readings = await getReadings(args.start_date, args.end_date);
+        const readings = await getReadings(args.start_date, args.end_date)
         const events = includeEvents
           ? await getEventTimeline(args.start_date, args.end_date, true)
-          : undefined;
+          : undefined
 
-        const chart = glucoseTimeSeries(readings, events);
+        const chart = glucoseTimeSeries(readings, events)
 
         return {
           content: [
@@ -85,25 +86,25 @@ export async function generateChartHandler(args: {
                   vegaLiteSpec: chart.spec,
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
-        };
+        }
       }
 
       case 'daily': {
-        const date = args.date || new Date().toISOString().split('T')[0];
-        const summary = await getDailySummary(date);
+        const date = args.date ?? new Date().toISOString().split('T')[0]
+        const summary = await getDailySummary(date)
         const events = includeEvents
           ? await getEventTimeline(
-              new Date(date + 'T00:00:00').toISOString(),
-              new Date(date + 'T23:59:59').toISOString(),
-              true
+              new Date(`${date}T00:00:00`).toISOString(),
+              new Date(`${date}T23:59:59`).toISOString(),
+              true,
             )
-          : undefined;
+          : undefined
 
-        const chart = dailySummaryChart(summary.readings, events);
+        const chart = dailySummaryChart(summary.readings, events)
 
         return {
           content: [
@@ -118,11 +119,11 @@ export async function generateChartHandler(args: {
                   vegaLiteSpec: chart.spec,
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
-        };
+        }
       }
 
       case 'weekly': {
@@ -135,26 +136,26 @@ export async function generateChartHandler(args: {
               },
             ],
             isError: true,
-          };
+          }
         }
 
-        const startDate = new Date(args.start_date);
-        const dailyStats = [];
+        const startDate = new Date(args.start_date)
+        const dailyStats = []
 
         for (let i = 0; i < 7; i++) {
-          const currentDate = new Date(startDate);
-          currentDate.setDate(currentDate.getDate() + i);
-          const dateStr = currentDate.toISOString().split('T')[0];
+          const currentDate = new Date(startDate)
+          currentDate.setDate(currentDate.getDate() + i)
+          const dateStr = currentDate.toISOString().split('T')[0]
 
-          const summary = await getDailySummary(dateStr);
+          const summary = await getDailySummary(dateStr)
           dailyStats.push({
             date: dateStr,
             avgGlucose: summary.statistics.average,
             timeInRange: summary.statistics.timeInRange,
-          });
+          })
         }
 
-        const chart = weeklyOverview(dailyStats);
+        const chart = weeklyOverview(dailyStats)
 
         return {
           content: [
@@ -168,20 +169,20 @@ export async function generateChartHandler(args: {
                   vegaLiteSpec: chart.spec,
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
-        };
+        }
       }
 
       case 'agp': {
-        const days = args.days || 14;
-        const endTime = new Date();
-        const startTime = new Date(endTime.getTime() - days * 24 * 60 * 60 * 1000);
+        const days = args.days ?? 14
+        const endTime = new Date()
+        const startTime = new Date(endTime.getTime() - days * 24 * 60 * 60 * 1000)
 
-        const readings = await getReadings(startTime.toISOString(), endTime.toISOString());
-        const chart = agpChart(readings);
+        const readings = await getReadings(startTime.toISOString(), endTime.toISOString())
+        const chart = agpChart(readings)
 
         return {
           content: [
@@ -196,11 +197,11 @@ export async function generateChartHandler(args: {
                   vegaLiteSpec: chart.spec,
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
-        };
+        }
       }
 
       default:
@@ -212,7 +213,7 @@ export async function generateChartHandler(args: {
             },
           ],
           isError: true,
-        };
+        }
     }
   } catch (error) {
     return {
@@ -223,6 +224,6 @@ export async function generateChartHandler(args: {
         },
       ],
       isError: true,
-    };
+    }
   }
 }

@@ -1,56 +1,50 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js'
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 import {
-  ListToolsRequestSchema,
-  CallToolRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-import {
-  getLatestGlucoseTool,
-  getLatestGlucoseHandler,
-  getGlucoseRangeTool,
-  getGlucoseRangeHandler,
-  getDailySummaryTool,
-  getDailySummaryHandler,
-  getGlucoseStatisticsTool,
-  getGlucoseStatisticsHandler,
-} from './glucose-tools.js';
-import {
-  analyzeTrendsTool,
   analyzeTrendsHandler,
-  compareExpectedVsActualTool,
+  analyzeTrendsTool,
   compareExpectedVsActualHandler,
-  detectParameterDriftTool,
+  compareExpectedVsActualTool,
   detectParameterDriftHandler,
-} from './analysis-tools.js';
+  detectParameterDriftTool,
+} from './analysis-tools.js'
+import { generateChartHandler, generateChartTool } from './chart-tools.js'
 import {
-  logInsulinTool,
-  logInsulinHandler,
-  logCarbsTool,
-  logCarbsHandler,
-  logExerciseTool,
-  logExerciseHandler,
-  getEventTimelineTool,
-  getEventTimelineHandler,
-  getInsulinEventsTool,
-  getInsulinEventsHandler,
-  getCarbEventsTool,
   getCarbEventsHandler,
-  getExerciseEventsTool,
+  getCarbEventsTool,
+  getEventTimelineHandler,
+  getEventTimelineTool,
   getExerciseEventsHandler,
-} from './event-tools.js';
+  getExerciseEventsTool,
+  getInsulinEventsHandler,
+  getInsulinEventsTool,
+  logCarbsHandler,
+  logCarbsTool,
+  logExerciseHandler,
+  logExerciseTool,
+  logInsulinHandler,
+  logInsulinTool,
+} from './event-tools.js'
 import {
-  generateChartTool,
-  generateChartHandler,
-} from './chart-tools.js';
+  getDailySummaryHandler,
+  getDailySummaryTool,
+  getGlucoseRangeHandler,
+  getGlucoseRangeTool,
+  getGlucoseStatisticsHandler,
+  getGlucoseStatisticsTool,
+  getLatestGlucoseHandler,
+  getLatestGlucoseTool,
+} from './glucose-tools.js'
 import {
-  getBaselineParametersTool,
-  getBaselineParametersHandler,
-  updateBaselineParametersTool,
-  updateBaselineParametersHandler,
-  predictGlucoseImpactTool,
-  predictGlucoseImpactHandler,
-  getAdaptiveInsightsTool,
   getAdaptiveInsightsHandler,
-} from './modeling-tools.js';
+  getAdaptiveInsightsTool,
+  getBaselineParametersHandler,
+  getBaselineParametersTool,
+  predictGlucoseImpactHandler,
+  predictGlucoseImpactTool,
+  updateBaselineParametersHandler,
+  updateBaselineParametersTool,
+} from './modeling-tools.js'
 
 /**
  * Tool Registry
@@ -476,68 +470,96 @@ export function registerAllTools(server: Server): void {
         },
       },
     ],
-  }));
+  }))
 
   // ============================================================================
   // Tool Call Handlers
   // ============================================================================
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
+    const { name, arguments: args } = request.params
 
     switch (name) {
       // Glucose Tools
       case getLatestGlucoseTool.name:
-        return await getLatestGlucoseHandler();
+        return await getLatestGlucoseHandler()
       case getGlucoseRangeTool.name:
-        return await getGlucoseRangeHandler(args as any);
+        return await getGlucoseRangeHandler(
+          (args ?? {}) as Parameters<typeof getGlucoseRangeHandler>[0],
+        )
       case getDailySummaryTool.name:
-        return await getDailySummaryHandler(args as any);
+        return await getDailySummaryHandler(
+          (args ?? {}) as Parameters<typeof getDailySummaryHandler>[0],
+        )
       case getGlucoseStatisticsTool.name:
-        return await getGlucoseStatisticsHandler(args as any);
+        return await getGlucoseStatisticsHandler(
+          (args ?? {}) as Parameters<typeof getGlucoseStatisticsHandler>[0],
+        )
 
       // Analysis Tools
       case analyzeTrendsTool.name:
-        return await analyzeTrendsHandler(args as any);
+        return await analyzeTrendsHandler(
+          (args ?? {}) as Parameters<typeof analyzeTrendsHandler>[0],
+        )
       case compareExpectedVsActualTool.name:
-        return await compareExpectedVsActualHandler(args as any);
+        return await compareExpectedVsActualHandler(
+          (args ?? {}) as Parameters<typeof compareExpectedVsActualHandler>[0],
+        )
       case detectParameterDriftTool.name:
-        return await detectParameterDriftHandler(args as any);
+        return await detectParameterDriftHandler(
+          (args ?? {}) as Parameters<typeof detectParameterDriftHandler>[0],
+        )
 
       // Event Tools
       case logInsulinTool.name:
-        return await logInsulinHandler(args as any);
+        return await logInsulinHandler((args ?? {}) as Parameters<typeof logInsulinHandler>[0])
       case logCarbsTool.name:
-        return await logCarbsHandler(args as any);
+        return await logCarbsHandler((args ?? {}) as Parameters<typeof logCarbsHandler>[0])
       case logExerciseTool.name:
-        return await logExerciseHandler(args as any);
+        return await logExerciseHandler((args ?? {}) as Parameters<typeof logExerciseHandler>[0])
       case getEventTimelineTool.name:
-        return await getEventTimelineHandler(args as any);
+        return await getEventTimelineHandler(
+          (args ?? {}) as Parameters<typeof getEventTimelineHandler>[0],
+        )
       case getInsulinEventsTool.name:
-        return await getInsulinEventsHandler(args as any);
+        return await getInsulinEventsHandler(
+          (args ?? {}) as Parameters<typeof getInsulinEventsHandler>[0],
+        )
       case getCarbEventsTool.name:
-        return await getCarbEventsHandler(args as any);
+        return await getCarbEventsHandler(
+          (args ?? {}) as Parameters<typeof getCarbEventsHandler>[0],
+        )
       case getExerciseEventsTool.name:
-        return await getExerciseEventsHandler(args as any);
+        return await getExerciseEventsHandler(
+          (args ?? {}) as Parameters<typeof getExerciseEventsHandler>[0],
+        )
 
       // Chart Tools
       case generateChartTool.name:
-        return await generateChartHandler(args as any);
+        return await generateChartHandler(
+          (args ?? {}) as Parameters<typeof generateChartHandler>[0],
+        )
 
       // Modeling Tools
       case getBaselineParametersTool.name:
-        return await getBaselineParametersHandler();
+        return await getBaselineParametersHandler()
       case updateBaselineParametersTool.name:
-        return await updateBaselineParametersHandler(args as any);
+        return await updateBaselineParametersHandler(
+          (args ?? {}) as Parameters<typeof updateBaselineParametersHandler>[0],
+        )
       case predictGlucoseImpactTool.name:
-        return await predictGlucoseImpactHandler(args as any);
+        return await predictGlucoseImpactHandler(
+          (args ?? {}) as Parameters<typeof predictGlucoseImpactHandler>[0],
+        )
       case getAdaptiveInsightsTool.name:
-        return await getAdaptiveInsightsHandler(args as any);
+        return await getAdaptiveInsightsHandler(
+          (args ?? {}) as Parameters<typeof getAdaptiveInsightsHandler>[0],
+        )
 
       default:
-        throw new Error(`Unknown tool: ${name}`);
+        throw new Error(`Unknown tool: ${name}`)
     }
-  });
+  })
 
-  console.error('✅ All tools registered');
+  console.error('✅ All tools registered')
 }
