@@ -34,6 +34,23 @@ const envSchema = z.object({
 
   // API environment
   DEXCOM_API_ENV: z.enum(['production', 'sandbox']).default('production'),
+
+  // Local calendar day boundaries for daily summaries and charts
+  SERVER_TIMEZONE: z
+    .string()
+    .trim()
+    .default('UTC')
+    .refine(
+      (value) => {
+        try {
+          new Intl.DateTimeFormat(undefined, { timeZone: value })
+          return true
+        } catch {
+          return false
+        }
+      },
+      { message: 'SERVER_TIMEZONE must be a valid IANA time zone' },
+    ),
 })
 
 /**

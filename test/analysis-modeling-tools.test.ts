@@ -11,6 +11,7 @@ vi.mock('../src/config/env.js', () => ({
     DEXCOM_ACCESS_TOKEN: 'test-access-token',
     DEXCOM_REFRESH_TOKEN: 'test-refresh-token',
     DEXCOM_API_ENV: 'sandbox',
+    SERVER_TIMEZONE: 'UTC',
     DB_PATH: ':memory:',
   },
   getDexcomApiBaseUrl: vi.fn(() => 'https://sandbox-api.dexcom.com'),

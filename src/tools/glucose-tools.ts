@@ -1,10 +1,12 @@
 import { z } from 'zod'
+import { env } from '../config/env.js'
 import {
   calculateStatistics,
   getDailySummary,
   getLatestReading,
   getReadings,
 } from '../services/glucose.service.js'
+import { todayInTimezone } from '../utils/timezone.js'
 
 /**
  * Glucose MCP Tools
@@ -144,7 +146,7 @@ export const getDailySummaryTool = {
 
 export async function getDailySummaryHandler(args: { date?: string }) {
   try {
-    const date = args.date ?? new Date().toISOString().split('T')[0]
+    const date = args.date ?? todayInTimezone(env.SERVER_TIMEZONE)
     const summary = await getDailySummary(date)
 
     return {
