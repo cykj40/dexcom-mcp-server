@@ -1,6 +1,8 @@
+import { env } from '../config/env.js'
 import { getLatestReading as getLatestFromDb, getReadingsInRange } from '../db/queries.js'
 import type { GlucoseReading, GlucoseStatistics } from '../types/index.js'
 import { TARGET_RANGE } from '../types/index.js'
+import { dayBoundsInTimezone } from '../utils/timezone.js'
 import { fetchEGVs } from './dexcom-api.service.js'
 import { getLatestShareReading } from './dexcom-share.service.js'
 
@@ -234,11 +236,7 @@ export async function getDailySummary(date: string): Promise<{
   statistics: GlucoseStatistics
   readings: GlucoseReading[]
 }> {
-  const startOfDay = new Date(date)
-  startOfDay.setHours(0, 0, 0, 0)
-
-  const endOfDay = new Date(date)
-  endOfDay.setHours(23, 59, 59, 999)
+  const { start: startOfDay, end: endOfDay } = dayBoundsInTimezone(date, env.SERVER_TIMEZONE)
 
   const readings = await getReadings(startOfDay.toISOString(), endOfDay.toISOString())
   const statistics = calculateStatistics(readings)

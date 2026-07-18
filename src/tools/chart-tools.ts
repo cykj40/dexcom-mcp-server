@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { env } from '../config/env.js'
 import {
   agpChart,
   dailySummaryChart,
@@ -7,6 +8,7 @@ import {
 } from '../services/chart.service.js'
 import { getEventTimeline } from '../services/events.service.js'
 import { getDailySummary, getReadings } from '../services/glucose.service.js'
+import { dayBoundsInTimezone, todayInTimezone } from '../utils/timezone.js'
 
 /**
  * Chart MCP Tools
@@ -94,14 +96,11 @@ export async function generateChartHandler(args: {
       }
 
       case 'daily': {
-        const date = args.date ?? new Date().toISOString().split('T')[0]
+        const date = args.date ?? todayInTimezone(env.SERVER_TIMEZONE)
         const summary = await getDailySummary(date)
+        const { start, end } = dayBoundsInTimezone(date, env.SERVER_TIMEZONE)
         const events = includeEvents
-          ? await getEventTimeline(
-              new Date(`${date}T00:00:00`).toISOString(),
-              new Date(`${date}T23:59:59`).toISOString(),
-              true,
-            )
+          ? await getEventTimeline(start.toISOString(), end.toISOString(), true)
           : undefined
 
         const chart = dailySummaryChart(summary.readings, events)
@@ -139,13 +138,13 @@ export async function generateChartHandler(args: {
           }
         }
 
-        const startDate = new Date(args.start_date)
+        const startCalendarDate = args.start_date.slice(0, 10)
         const dailyStats = []
 
         for (let i = 0; i < 7; i++) {
-          const currentDate = new Date(startDate)
-          currentDate.setDate(currentDate.getDate() + i)
-          const dateStr = currentDate.toISOString().split('T')[0]
+          const currentDate = new Date(`${startCalendarDate}T00:00:00.000Z`)
+          currentDate.setUTCDate(currentDate.getUTCDate() + i)
+          const dateStr = currentDate.toISOString().slice(0, 10)
 
           const summary = await getDailySummary(dateStr)
           dailyStats.push({
