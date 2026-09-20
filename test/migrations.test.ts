@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const execute = vi.hoisted(() => vi.fn())
 
 vi.mock('../src/db/database.js', () => ({
-  getDb: () => ({ execute }),
+  getDb: () => ({ execute, batch: vi.fn(async () => {}) }),
 }))
 
 import { runMigrations } from '../src/db/migrations.js'

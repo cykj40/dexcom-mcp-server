@@ -1,3 +1,4 @@
+import { migrateOAuth } from '../auth/schema.js'
 import { getDb } from './database.js'
 
 /**
@@ -155,6 +156,8 @@ export async function runMigrations(): Promise<void> {
       VALUES (1, 30, 4, 30, 'morning')
     `)
   }
+
+  await migrateOAuth(db)
 
   console.error('✅ Migrations completed')
 }

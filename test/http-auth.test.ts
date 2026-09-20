@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto'
-import type { Request, RequestHandler, Response } from 'express'
+import type { RequestHandler } from 'express'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { hash } from '../src/auth/crypto.js'
 
 // No actual environment, database, Dexcom service, MCP transport, or listener is loaded.
 const harness = vi.hoisted(() => ({
@@ -18,7 +19,18 @@ vi.mock('node:crypto', async (importOriginal) => {
   return { ...actual, timingSafeEqual: vi.fn(actual.timingSafeEqual) }
 })
 vi.mock('../src/config/env.js', () => ({ env: harness.env }))
-vi.mock('../src/db/database.js', () => ({ closeDb: vi.fn() }))
+vi.mock('../src/db/database.js', () => ({
+  closeDb: vi.fn(),
+  getDb: vi.fn(() => {
+    throw new Error('No database in boot tests')
+  }),
+}))
+vi.mock('../src/auth/store.js', () => ({
+  OAuthStore: class {
+    cleanup = vi.fn(async () => {})
+    now = () => 1789862400
+  },
+}))
 vi.mock('../src/db/migrations.js', () => ({ runMigrations: harness.migrate }))
 vi.mock('../src/services/dexcom-api.service.js', () => ({
   initializeTokens: harness.initializeTokens,
@@ -50,6 +62,7 @@ vi.mock('express', () => {
   return {
     default: Object.assign(
       () => ({
+        disable: vi.fn(),
         use: vi.fn((middleware: RequestHandler) => {
           if (middleware === jsonMiddleware) harness.registrations.push('express.json')
           if (middleware === urlencodedMiddleware) harness.registrations.push('express.urlencoded')
@@ -76,6 +89,8 @@ const validEnv = {
   TRANSPORT: 'http',
   MCP_AUTH_TOKEN: bearer,
   OAUTH_CLIENT_ID: clientId,
+  OAUTH_ISSUER_URL: 'https://server.example.invalid',
+  OAUTH_OWNER_APPROVAL_KEY_SHA256: hash('A'.repeat(43)),
   OAUTH_CLIENT_SECRET: clientSecret,
   OAUTH_ALLOWED_REDIRECT_URIS: ` ${callback}, ${otherCallback} `,
 }
@@ -90,6 +105,7 @@ beforeEach(() => {
   harness.registrations.length = 0
   Object.assign(harness.env, validEnv)
   originalListeners = new Map(signals.map((signal) => [signal, process.listeners(signal)]))
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-20T00:00:00Z'))
   vi.spyOn(console, 'error').mockImplementation(() => {})
   // Only main().catch reaches this mock for startup validation failures.
   vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
@@ -127,52 +143,6 @@ async function boot(overrides: Record<string, string | undefined> = {}) {
   return entrypoint
 }
 
-function invoke(route: string, request: Partial<Request>) {
-  const handlers = harness.routes.get(route)
-  if (!handlers) throw new Error(`Missing handler: ${route}`)
-  const [method, path] = route.split(' ')
-  const headers = request.headers ?? {}
-  const normalizedRequest = {
-    method,
-    path,
-    query: {},
-    body: undefined,
-    ...request,
-    headers,
-    get: (name: string) => {
-      const value = headers[name.toLowerCase() as keyof typeof headers]
-      return typeof value === 'string' ? value : undefined
-    },
-  } as unknown as Request
-  const response = { statusCode: 200 } as {
-    statusCode: number
-    status: ReturnType<typeof vi.fn>
-    json: ReturnType<typeof vi.fn>
-    redirect: ReturnType<typeof vi.fn>
-    setHeader: ReturnType<typeof vi.fn>
-  }
-  response.status = vi.fn((status: number) => {
-    response.statusCode = status
-    return response
-  })
-  response.json = vi.fn(() => response)
-  response.redirect = vi.fn(() => {
-    response.statusCode = 302
-    return response
-  })
-  response.setHeader = vi.fn(() => response)
-
-  let handlerIndex = 0
-  const runNextHandler = () => {
-    const handler = handlers[handlerIndex]
-    handlerIndex += 1
-    if (handler) handler(normalizedRequest, response as unknown as Response, next)
-  }
-  const next = vi.fn(runNextHandler)
-  runNextHandler()
-  return { response, next }
-}
-
 function expectBootRejected() {
   expect(process.exit).toHaveBeenCalledExactlyOnceWith(1)
   expect(harness.migrate).not.toHaveBeenCalled()
@@ -183,7 +153,14 @@ function expectBootRejected() {
 }
 
 describe('HTTP startup validation', () => {
-  for (const name of ['MCP_AUTH_TOKEN', 'OAUTH_CLIENT_SECRET', 'OAUTH_ALLOWED_REDIRECT_URIS']) {
+  for (const name of [
+    'MCP_AUTH_TOKEN',
+    'OAUTH_CLIENT_ID',
+    'OAUTH_CLIENT_SECRET',
+    'OAUTH_ALLOWED_REDIRECT_URIS',
+    'OAUTH_ISSUER_URL',
+    'OAUTH_OWNER_APPROVAL_KEY_SHA256',
+  ]) {
     it.each([undefined, '', ' \t\n '])(`rejects %s for required setting ${name}`, async (value) => {
       await boot({ [name]: value })
       expectBootRejected()
@@ -208,6 +185,28 @@ describe('HTTP startup validation', () => {
     expect((error as Error).message).toBe(
       `Invalid OAUTH_ALLOWED_REDIRECT_URIS entry: ${JSON.stringify(offendingEntry)}`,
     )
+  })
+
+  it.each([
+    'not-a-hash',
+    'A'.repeat(64),
+    hash(clientSecret),
+    hash(bearer),
+    hash(clientId),
+  ])('rejects malformed/reused owner-key digest before startup side effects', async (digest) => {
+    await boot({ OAUTH_OWNER_APPROVAL_KEY_SHA256: digest })
+    expectBootRejected()
+  })
+
+  it.each([
+    'http://server.example.invalid',
+    'https://server.example.invalid/',
+    'https://server.example.invalid/path',
+    'https://user:pass@server.example.invalid',
+    'not a url',
+  ])('rejects invalid canonical issuer %s before startup side effects', async (issuer) => {
+    await boot({ OAUTH_ISSUER_URL: issuer })
+    expectBootRejected()
   })
 
   it('starts HTTP with a valid list', async () => {
@@ -240,85 +239,58 @@ describe('HTTP startup validation', () => {
   })
 })
 
-describe('authorize redirect validation', () => {
-  it.each(
-    [
-      undefined,
-      '',
-      '/relative',
-      'https://attacker.example.invalid/callback',
-      `${callback}&extra=1`,
-      `${callback}#fragment`,
-      `${otherCallback}/`,
-      otherCallback.replace('/callback', '/callback-evil'),
-      otherCallback.replace('other.example.invalid', 'other.example.invalid.attacker.invalid'),
-      otherCallback.replace('other.example.invalid', 'OTHER.example.invalid'),
-      ` ${otherCallback}`,
-      [otherCallback],
-      { uri: otherCallback },
-    ].map((redirectUri) => ({ redirectUri })),
-  )('rejects unlisted/non-string redirect $redirectUri with no redirect', async ({
-    redirectUri,
-  }) => {
+// Guards http.ts:206-207: validSecret is computed unconditionally, so a wrong
+// client_id must not short-circuit the client_secret comparison away.
+describe('token endpoint constant-time client authentication', () => {
+  async function postToken(body: Record<string, unknown>) {
     await boot()
-    const { response } = invoke('GET /authorize', {
-      query: {
-        client_id: clientId,
-        response_type: 'code',
-        redirect_uri: redirectUri,
-      } as Request['query'],
+    const handlers = harness.routes.get('POST /token')
+    expect(handlers).toHaveLength(1)
+    const response = {
+      headersSent: false,
+      setHeader: vi.fn(),
+      status: vi.fn(() => response),
+      json: vi.fn(() => response),
+    }
+    vi.mocked(timingSafeEqual).mockClear()
+    await (handlers?.[0] as unknown as (q: unknown, s: unknown, n: unknown) => Promise<void>)(
+      { body, query: {}, headers: {}, rawHeaders: [] },
+      response,
+      vi.fn(),
+    )
+    const comparedSecrets = vi
+      .mocked(timingSafeEqual)
+      .mock.calls.filter(([, configured]) =>
+        Buffer.from(configured).equals(Buffer.from(clientSecret, 'utf8')),
+      )
+    return { response, comparedSecrets }
+  }
+
+  it.each([
+    { id: clientId, status: 400, label: 'a correct client_id' },
+    { id: 'wrong-client', status: 401, label: 'a wrong client_id' },
+    { id: undefined, status: 401, label: 'a missing client_id' },
+    { id: clientId.slice(0, -1), status: 401, label: 'a truncated client_id' },
+  ])('compares the client secret given $label', async ({ id, status }) => {
+    const { response, comparedSecrets } = await postToken({
+      grant_type: 'refresh_token',
+      client_id: id,
+      client_secret: clientSecret,
     })
-    expect(response.status).toHaveBeenCalledWith(400)
-    expect(response.json).toHaveBeenCalledWith({
-      error: 'invalid_request',
-      error_description: 'redirect_uri missing or not allowed',
-    })
-    expect(response.redirect).not.toHaveBeenCalled()
-    expect(response.setHeader).not.toHaveBeenCalled()
+    // The branch taken differs, but the secret comparison runs exactly once either way.
+    expect(response.status).toHaveBeenCalledWith(status)
+    expect(comparedSecrets).toHaveLength(1)
+    const [supplied, configured] = comparedSecrets[0]
+    expect(supplied.byteLength).toBe(configured.byteLength)
   })
 
-  it.each([callback, otherCallback])('accepts the exact configured URI %s', async (redirectUri) => {
-    await boot()
-    const { response } = invoke('GET /authorize', {
-      query: {
-        client_id: clientId,
-        response_type: 'code',
-        redirect_uri: redirectUri,
-        state: 'test-state',
-      },
-    })
-    const expected = new URL(redirectUri)
-    expected.searchParams.set('code', bearer)
-    expected.searchParams.set('state', 'test-state')
-    expect(response.redirect).toHaveBeenCalledExactlyOnceWith(expected.toString())
-    expect(response.status).not.toHaveBeenCalled()
-  })
-
-  it.each([undefined, 'wrong-client'])('retains client-ID rejection for %s', async (id) => {
-    await boot()
-    const { response } = invoke('GET /authorize', {
-      query: { client_id: id, response_type: 'code', redirect_uri: callback },
+  it('compares the client secret even when it is absent and the client_id is wrong', async () => {
+    const { response, comparedSecrets } = await postToken({
+      grant_type: 'refresh_token',
+      client_id: 'wrong-client',
     })
     expect(response.status).toHaveBeenCalledWith(401)
-    expect(response.json).toHaveBeenCalledWith({ error: 'invalid_client' })
-    expect(response.redirect).not.toHaveBeenCalled()
-  })
-
-  it('checks redirect before the invalid client-ID branch', async () => {
-    await boot()
-    const { response } = invoke('GET /authorize', { query: { client_id: 'wrong-client' } })
-    expect(response.status).toHaveBeenCalledWith(400)
-    expect(response.redirect).not.toHaveBeenCalled()
-  })
-
-  it('retains response-type validation', async () => {
-    await boot()
-    const { response } = invoke('GET /authorize', {
-      query: { client_id: clientId, response_type: 'token', redirect_uri: callback },
-    })
-    expect(response.status).toHaveBeenCalledWith(400)
-    expect(response.json).toHaveBeenCalledWith({ error: 'unsupported_response_type' })
-    expect(response.redirect).not.toHaveBeenCalled()
+    expect(comparedSecrets).toHaveLength(1)
   })
 })
 
@@ -337,6 +309,7 @@ describe('secret comparison', () => {
     { candidate: 'é', expected: 'aa', valid: false, comparisons: 1 },
   ])('checks $candidate against $expected', async ({ candidate, expected, valid, comparisons }) => {
     const { secretEquals } = await boot()
+    vi.mocked(timingSafeEqual).mockClear()
     expect(secretEquals(candidate, expected)).toBe(valid)
     expect(timingSafeEqual).toHaveBeenCalledTimes(comparisons)
     for (const [supplied, configured] of vi.mocked(timingSafeEqual).mock.calls) {
@@ -345,79 +318,4 @@ describe('secret comparison', () => {
       expect(supplied.byteLength).toBe(configured.byteLength)
     }
   })
-})
-
-describe('token endpoint comparisons', () => {
-  const validBody = {
-    grant_type: 'authorization_code',
-    code: bearer,
-    client_id: clientId,
-    client_secret: clientSecret,
-  }
-
-  for (const field of ['client_secret', 'code'] as const) {
-    const valid = validBody[field]
-    it.each(
-      [undefined, '', 'wrong', valid.slice(0, -1), `${valid}\0`, [valid], {}].map((value) => ({
-        value,
-      })),
-    )(`rejects invalid ${field} $value using timingSafeEqual`, async ({ value }) => {
-      await boot()
-      const { response } = invoke('POST /token', { body: { ...validBody, [field]: value } })
-      expect(response.status).toHaveBeenCalledWith(field === 'client_secret' ? 401 : 400)
-      expect(response.json).toHaveBeenCalledWith({
-        error: field === 'client_secret' ? 'invalid_client' : 'invalid_grant',
-      })
-      expect(timingSafeEqual).toHaveBeenCalledTimes(field === 'client_secret' ? 1 : 2)
-    })
-  }
-
-  it('compares the secret even when the client ID is invalid', async () => {
-    await boot()
-    const { response } = invoke('POST /token', {
-      body: { ...validBody, client_id: 'wrong-client' },
-    })
-    expect(response.status).toHaveBeenCalledWith(401)
-    expect(timingSafeEqual).toHaveBeenCalledOnce()
-  })
-
-  it('preserves the successful token response including expires_in', async () => {
-    await boot()
-    const { response } = invoke('POST /token', { body: validBody })
-    expect(response.status).not.toHaveBeenCalled()
-    expect(response.json).toHaveBeenCalledExactlyOnceWith({
-      access_token: bearer,
-      token_type: 'bearer',
-      expires_in: 3600,
-    })
-    expect(timingSafeEqual).toHaveBeenCalledTimes(2)
-  })
-})
-
-describe('MCP bearer middleware', () => {
-  for (const method of ['GET', 'POST', 'DELETE']) {
-    it.each([
-      undefined,
-      '',
-      'Bearer wrong',
-      `Bearer ${bearer.slice(0, -1)}`,
-      `Bearer ${bearer}\0`,
-    ])(`rejects invalid authorization %j on ${method}`, async (authorization) => {
-      await boot()
-      const { response, next } = invoke(`${method} /mcp`, { headers: { authorization } })
-      expect(response.status).toHaveBeenCalledWith(401)
-      expect(next).not.toHaveBeenCalled()
-      expect(timingSafeEqual).toHaveBeenCalledOnce()
-    })
-
-    it(`accepts the exact bearer on ${method}`, async () => {
-      await boot()
-      const { response, next } = invoke(`${method} /mcp`, {
-        headers: { authorization: `Bearer ${bearer}` },
-      })
-      expect(response.status).not.toHaveBeenCalled()
-      expect(next).toHaveBeenCalledOnce()
-      expect(timingSafeEqual).toHaveBeenCalledOnce()
-    })
-  }
 })

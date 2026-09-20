@@ -28,6 +28,8 @@ const envSchema = z.object({
   OAUTH_CLIENT_ID: z.string().optional(),
   OAUTH_CLIENT_SECRET: z.string().optional(),
   OAUTH_ALLOWED_REDIRECT_URIS: z.string().optional(),
+  OAUTH_ISSUER_URL: z.string().optional(),
+  OAUTH_OWNER_APPROVAL_KEY_SHA256: z.string().optional(),
 
   // Transport mode
   TRANSPORT: z.enum(['http', 'stdio']).optional(),

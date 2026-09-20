@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // Tests use synthetic settings; do not let Vite read .env or .env.* files.
+  envDir: false,
   test: {
     globals: true,
     environment: 'node',
