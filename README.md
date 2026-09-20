@@ -25,6 +25,7 @@ This is a **human-in-the-loop assistive intelligence system**:
 - Node.js 18+
 - Dexcom Developer API credentials ([apply here](https://developer.dexcom.com/))
 - A Dexcom CGM device actively transmitting data
+- A Turso database for persistent glucose, event, model, and OAuth token storage
 
 ## 🔧 Installation
 
@@ -106,29 +107,37 @@ Restart Claude Desktop, and you'll have access to all Dexcom tools.
 - `log_carbs` - Log carbohydrate intake
 - `log_exercise` - Log physical activity
 - `get_event_timeline` - View all events with glucose context
+- `get_insulin_events` - Get insulin events within a time range
+- `get_carb_events` - Get carbohydrate events within a time range
+- `get_exercise_events` - Get exercise events within a time range
 
 ### Chart Tools
 - `generate_chart` - Create visualizations (timeline, daily, weekly, AGP)
 
 ### Modeling Tools
 - `get_baseline_parameters` - View your ISF, ICR, and basal dose
+- `update_baseline_parameters` - Update baseline parameters after explicit confirmation
 - `predict_glucose_impact` - Predict effect of insulin or carbs
 - `get_adaptive_insights` - See how predictions compare to reality
 
 ## 📊 Database
 
-All data is stored locally in SQLite at `./data/dexcom.db`:
+Persistent data is stored in the configured Turso/libSQL database:
 
 - Glucose readings (from Dexcom API and Share API)
 - Insulin, carb, and exercise events
 - Adaptive observations (expected vs actual outcomes)
+- Baseline modeling parameters
+- Dexcom OAuth access and refresh tokens
 
-No data is shared with third parties.
+Turso is a third-party managed database service, so this data does not remain solely on
+the machine running the server. Requested tool results are also returned to the connected
+MCP client, such as Claude. Protect the Turso and MCP credentials accordingly.
 
 ## 🔒 Security
 
 - **Environment variables only**: Never hardcode credentials
-- **Local storage**: All data stays on your machine
+- **Remote persistence**: Sensitive health data and Dexcom OAuth tokens are stored in Turso
 - **OAuth 2.0**: Uses official Dexcom Developer API
 - **Read-only device access**: Cannot modify pump settings
 
@@ -162,18 +171,17 @@ npm run build
 dexcom-mcp-server/
 ├── src/
 │   ├── config/         # Environment validation
-│   ├── db/             # SQLite database layer
+│   ├── db/             # Turso/libSQL database layer
 │   ├── services/       # Business logic
 │   ├── tools/          # MCP tool definitions
 │   ├── types/          # TypeScript types
 │   └── index.ts        # Server entrypoint
-├── data/               # SQLite database (gitignored)
 └── dist/               # Compiled JavaScript
 ```
 
 ## 📝 License
 
-ISC License - See LICENSE file for details
+MIT License - See LICENSE file for details
 
 ## 🤝 Contributing
 
