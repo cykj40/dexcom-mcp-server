@@ -6,7 +6,7 @@ import { SHARE_TREND_MAP, TREND_DESCRIPTIONS } from '../types/index.js'
 /**
  * Dexcom Share API Service (Best-Effort Fallback)
  * Undocumented, unreliable API - use only when Developer API fails
- * Never throw on errors, just log warnings and return empty results
+ * Network and authentication failures return empty results; persistence failures reject.
  */
 
 const APPLICATION_ID = 'd8665ade-9673-4e27-9ff6-92db4ce13d13'

@@ -122,7 +122,19 @@ export async function runMigrations(): Promise<void> {
     }
   }
 
-  // Baseline parameters table
+  // Seed defaults only when the table is first created. If an existing database
+  // loses its singleton row, callers must see that configuration failure.
+  const baselineTable = await db.execute({
+    sql: `
+      SELECT 1
+      FROM sqlite_master
+      WHERE type = 'table' AND name = 'baseline_parameters'
+      LIMIT 1
+    `,
+    args: [],
+  })
+  const initializeBaseline = baselineTable.rows.length === 0
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS baseline_parameters (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -135,12 +147,14 @@ export async function runMigrations(): Promise<void> {
     )
   `)
 
-  await db.execute(`
-    INSERT OR IGNORE INTO baseline_parameters (
-      id, correction_factor, insulin_to_carb_ratio, basal_dose, basal_timing
-    )
-    VALUES (1, 30, 4, 30, 'morning')
-  `)
+  if (initializeBaseline) {
+    await db.execute(`
+      INSERT INTO baseline_parameters (
+        id, correction_factor, insulin_to_carb_ratio, basal_dose, basal_timing
+      )
+      VALUES (1, 30, 4, 30, 'morning')
+    `)
+  }
 
   console.error('✅ Migrations completed')
 }

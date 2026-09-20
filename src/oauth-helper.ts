@@ -202,7 +202,9 @@ function generateState(): string {
         console.log(`  Expires In:    ${tokenData.expires_in} seconds`)
         console.log(`  Token Type:    ${tokenData.token_type}`)
         console.log('')
-        console.log('Token values are intentionally not printed; use your secure bootstrap workflow.')
+        console.log(
+          'Token values are intentionally not printed; use your secure bootstrap workflow.',
+        )
         console.log('')
         console.log('You can now start the MCP server:')
         console.log('')
