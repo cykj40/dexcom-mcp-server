@@ -12,6 +12,7 @@
  *   TRANSPORT=http            — Remote access via claude.ai
  */
 
+import { timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
@@ -31,11 +32,46 @@ import { initializeTokens } from './services/dexcom-api.service.js'
 // Register all tools
 import { registerAllTools } from './tools/index.js'
 
+export function secretEquals(candidate: unknown, expected: string | undefined): boolean {
+  if (expected === undefined || expected.length === 0) return false
+
+  const supplied = Buffer.from(typeof candidate === 'string' ? candidate : '', 'utf8')
+  const expectedBytes = Buffer.from(expected, 'utf8')
+  const comparable = Buffer.alloc(expectedBytes.length)
+  supplied.copy(comparable)
+  // Always compare equal-sized buffers, including for missing/wrong-length input.
+  const equal = timingSafeEqual(comparable, expectedBytes)
+  return equal && supplied.length === expectedBytes.length
+}
+
 /**
  * Main server initialization
  */
 async function main() {
   const transport = env.TRANSPORT ?? 'stdio'
+  const allowedRedirectUris = new Set<string>()
+
+  if (transport === 'http') {
+    if (
+      !env.MCP_AUTH_TOKEN?.trim() ||
+      !env.OAUTH_CLIENT_SECRET?.trim() ||
+      !env.OAUTH_ALLOWED_REDIRECT_URIS?.trim()
+    ) {
+      throw new Error(
+        'MCP_AUTH_TOKEN, OAUTH_CLIENT_SECRET, and OAUTH_ALLOWED_REDIRECT_URIS must be non-empty when TRANSPORT=http',
+      )
+    }
+
+    for (const entry of env.OAUTH_ALLOWED_REDIRECT_URIS.split(',')) {
+      const uri = entry.trim()
+      try {
+        new URL(uri)
+      } catch {
+        throw new Error(`Invalid OAUTH_ALLOWED_REDIRECT_URIS entry: ${JSON.stringify(uri)}`)
+      }
+      allowedRedirectUris.add(uri)
+    }
+  }
 
   console.error('🚀 Starting Dexcom MCP Server...')
   console.error(`📡 Transport: ${transport}`)
@@ -122,6 +158,14 @@ async function main() {
     app.get('/authorize', (req: Request, res: Response) => {
       const { response_type, client_id, redirect_uri, state } = req.query as Record<string, string>
 
+      if (typeof redirect_uri !== 'string' || !allowedRedirectUris.has(redirect_uri)) {
+        res.status(400).json({
+          error: 'invalid_request',
+          error_description: 'redirect_uri missing or not allowed',
+        })
+        return
+      }
+
       if (!oauthClientId || client_id !== oauthClientId) {
         res.status(401).json({ error: 'invalid_client' })
         return
@@ -130,13 +174,6 @@ async function main() {
         res.status(400).json({ error: 'unsupported_response_type' })
         return
       }
-      if (!redirect_uri) {
-        res
-          .status(400)
-          .json({ error: 'invalid_request', error_description: 'redirect_uri required' })
-        return
-      }
-
       const redirectUrl = new URL(redirect_uri)
       redirectUrl.searchParams.set('code', mcpAuthToken)
       if (state) redirectUrl.searchParams.set('state', state)
@@ -151,7 +188,8 @@ async function main() {
         res.status(503).json({ error: 'server_error', error_description: 'OAuth not configured' })
         return
       }
-      if (client_id !== oauthClientId || client_secret !== oauthClientSecret) {
+      const validClientSecret = secretEquals(client_secret, oauthClientSecret)
+      if (client_id !== oauthClientId || !validClientSecret) {
         res.status(401).json({ error: 'invalid_client' })
         return
       }
@@ -159,18 +197,19 @@ async function main() {
         res.status(400).json({ error: 'unsupported_grant_type' })
         return
       }
-      if (code !== mcpAuthToken) {
+      if (!secretEquals(code, mcpAuthToken)) {
         res.status(400).json({ error: 'invalid_grant' })
         return
       }
 
+      // Compatibility field only: bearer expiry is not enforced until Phase 2.
       res.json({ access_token: mcpAuthToken, token_type: 'bearer', expires_in: 3600 })
     })
 
     // Bearer token auth middleware for /mcp
     const requireAuth = (req: Request, res: Response, next: NextFunction) => {
       const authHeader = req.headers.authorization
-      if (!authHeader || authHeader !== `Bearer ${mcpAuthToken}`) {
+      if (!secretEquals(authHeader, `Bearer ${mcpAuthToken}`)) {
         res.status(401).json({ error: 'Unauthorized' })
         return
       }

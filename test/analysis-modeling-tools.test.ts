@@ -66,8 +66,9 @@ import {
 } from '../src/tools/analysis-tools.js';
 import {
   getBaselineParametersHandler,
-  predictGlucoseImpactHandler,
   getAdaptiveInsightsHandler,
+  predictGlucoseImpactHandler,
+  predictGlucoseImpactTool,
 } from '../src/tools/modeling-tools.js';
 import { generateChartHandler } from '../src/tools/chart-tools.js';
 
@@ -337,6 +338,40 @@ describe('Modeling Tools', () => {
   });
 
   describe('predict_glucose_impact', () => {
+    it('rejects zero as an explicit current glucose value', () => {
+      const result = predictGlucoseImpactTool.inputSchema.safeParse({
+        action_type: 'insulin',
+        insulin_units: 1,
+        current_glucose: 0,
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('does not treat an explicit zero as an omitted current glucose value', async () => {
+      vi.mocked(modelingService.predictGlucoseImpact).mockReturnValue({
+        currentGlucose: 0,
+        predictedChange: -30,
+        predictedGlucose: -30,
+        confidenceRange: { low: -45, high: -15 },
+        timeHorizonMinutes: 180,
+        factors: [],
+        disclaimer: '',
+      });
+
+      await predictGlucoseImpactHandler({
+        action_type: 'insulin',
+        insulin_units: 1,
+        current_glucose: 0,
+      });
+
+      expect(glucoseService.getLatestReading).not.toHaveBeenCalled();
+      expect(modelingService.predictGlucoseImpact).toHaveBeenCalledWith(
+        expect.any(Object),
+        0,
+      );
+    });
+
     it('should predict insulin impact on glucose', async () => {
       vi.mocked(modelingService.predictGlucoseImpact).mockReturnValue({
         currentGlucose: 180,

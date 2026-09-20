@@ -277,6 +277,7 @@ export const predictGlucoseImpactTool = {
         .describe('Carb grams (required if action_type is "carbs" or "both")'),
       current_glucose: z
         .number()
+        .positive()
         .optional()
         .describe('Current glucose in mg/dL (fetches live if not provided)'),
     })
@@ -292,7 +293,7 @@ export async function predictGlucoseImpactHandler(args: {
   try {
     // Get current glucose if not provided
     let currentGlucose = args.current_glucose
-    if (!currentGlucose) {
+    if (currentGlucose === undefined || currentGlucose === null) {
       const latestReading = await getLatestReading()
       if (!latestReading) {
         return {

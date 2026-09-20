@@ -7,7 +7,6 @@ import type {
   GlucoseReading,
   InsulinEvent,
 } from '../types/index.js'
-import { BASELINE_DEFAULTS } from '../types/index.js'
 import { getDb } from './database.js'
 
 // ============================================================================
@@ -54,11 +53,7 @@ export async function getBaselineParameters(): Promise<
   })
 
   if (result.rows.length === 0) {
-    console.error('Baseline parameters row missing; using hardcoded defaults as fallback')
-    return {
-      ...BASELINE_DEFAULTS,
-      updatedAt: new Date().toISOString(),
-    }
+    throw new Error('Baseline parameters row is missing')
   }
 
   const row = result.rows[0]

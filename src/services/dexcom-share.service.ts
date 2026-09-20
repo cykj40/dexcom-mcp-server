@@ -76,6 +76,8 @@ export async function fetchShareReadings(
   minutes: number = 1440,
   maxCount: number = 288,
 ): Promise<GlucoseReading[]> {
+  let data: DexcomShareReading[]
+
   try {
     // Ensure we're authenticated
     if (!sessionId) {
@@ -142,22 +144,22 @@ export async function fetchShareReadings(
         return []
       }
 
-      const retryData = (await retryResponse.json()) as DexcomShareReading[]
-      return processShareReadings(retryData)
+      data = (await retryResponse.json()) as DexcomShareReading[]
+    } else {
+      data = (await response.json()) as DexcomShareReading[]
     }
-
-    const data = (await response.json()) as DexcomShareReading[]
-    return processShareReadings(data)
   } catch (error) {
     console.warn('Share API fetch error (non-fatal):', error)
     return []
   }
+
+  return processShareReadings(data)
 }
 
 /**
  * Process Share API readings into standard format
  */
-function processShareReadings(data: DexcomShareReading[]): GlucoseReading[] {
+async function processShareReadings(data: DexcomShareReading[]): Promise<GlucoseReading[]> {
   if (!Array.isArray(data)) {
     console.warn('Share API returned unexpected data format')
     return []
@@ -183,14 +185,7 @@ function processShareReadings(data: DexcomShareReading[]): GlucoseReading[] {
 
   // Store in database
   for (const reading of readings) {
-    try {
-      insertGlucoseReading(reading)
-    } catch (error) {
-      // Ignore duplicate errors
-      if (!String(error).includes('UNIQUE')) {
-        console.warn('Error storing Share reading:', error)
-      }
-    }
+    await insertGlucoseReading(reading)
   }
 
   console.error(`✅ Fetched ${readings.length} readings from Share API`)

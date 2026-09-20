@@ -41,16 +41,6 @@ export interface BaselineParameters {
   notes?: string
 }
 
-/**
- * Baseline defaults used only as a database fallback.
- */
-export const BASELINE_DEFAULTS: BaselineParameters = {
-  correctionFactor: 30, // 1u lowers by 30 mg/dL
-  insulinToCarbRatio: 4, // 1u per 4g carbs
-  basalDose: 30, // 30u long-acting, morning
-  basalTiming: 'morning',
-}
-
 // ============================================================================
 // Event Types
 // ============================================================================

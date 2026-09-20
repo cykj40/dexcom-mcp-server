@@ -13,7 +13,7 @@ export function getDb(): Client {
       url: env.TURSO_DATABASE_URL,
       authToken: env.TURSO_AUTH_TOKEN,
     })
-    console.error(`✅ Database connected: ${env.TURSO_DATABASE_URL}`)
+    console.error('✅ Database connected')
   }
   return client
 }

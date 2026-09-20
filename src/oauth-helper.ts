@@ -197,8 +197,8 @@ function generateState(): string {
         console.log('  Tokens Received Successfully!')
         console.log('='.repeat(60))
         console.log('')
-        console.log(`  Access Token:  ${tokenData.access_token.slice(0, 20)}...`)
-        console.log(`  Refresh Token: ${tokenData.refresh_token.slice(0, 20)}...`)
+        console.log('  Access Token:  received (not displayed)')
+        console.log('  Refresh Token: received (not displayed)')
         console.log(`  Expires In:    ${tokenData.expires_in} seconds`)
         console.log(`  Token Type:    ${tokenData.token_type}`)
         console.log('')
@@ -213,7 +213,7 @@ function generateState(): string {
 
         res.writeHead(200, { 'Content-Type': 'text/html' })
         res.end(
-          '<h1>Success!</h1><p>Tokens were printed in your terminal for one-time Turso bootstrap. You can close this tab.</p>',
+          '<h1>Success!</h1><p>Tokens were received successfully. You can close this tab.</p>',
         )
       } catch (err) {
         console.error('\n❌ Token exchange failed:', err)
