@@ -163,19 +163,10 @@ export function registerOAuth(
         .map((part) => part.trim())
         .filter((part) => part.startsWith(`${COOKIE}=`))
       const nonce = cookies.length === 1 ? cookies[0].slice(COOKIE.length + 1) : undefined
-      console.error(JSON.stringify({
-        event: 'authorize_debug',
-        origin_header: req.headers.origin ?? null,
-        origin_matches_issuer: req.headers.origin === config.issuer,
-        cookie_header_present: Boolean(req.headers.cookie),
-        matching_cookie_count: cookies.length,
-        request_id_valid_format: isCredential(p.request_id),
-        csrf_token_valid_format: isCredential(p.csrf_token),
-        nonce_valid_format: isCredential(nonce),
-        decision_value: p.decision,
-      }))
       if (
-        req.headers.origin !== config.issuer ||
+        (req.headers.origin !== undefined &&
+          req.headers.origin !== 'null' &&
+          req.headers.origin !== config.issuer) ||
         !isCredential(p.request_id) ||
         !isCredential(p.csrf_token) ||
         !isCredential(nonce) ||
@@ -197,11 +188,6 @@ export function registerOAuth(
         p.csrf_token,
         p.decision === 'approve',
       )
-      console.error(JSON.stringify({
-        event: 'authorize_debug_decide',
-        decision_is_null: decision === null,
-        redirect_in_allowlist: decision ? config.redirects.has(decision.redirectUri) : null,
-      }))
       if (!decision || !config.redirects.has(decision.redirectUri)) {
         res.status(403).json({ error: 'access_denied' })
         return

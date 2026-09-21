@@ -304,7 +304,39 @@ describe('approval, discovery and PKCE over isolated Express HTTP', () => {
     expect((await decide(pending, { owner_key: key })).status).toBe(403)
     expect((await db.execute('SELECT * FROM mcp_oauth_codes')).rows).toHaveLength(0)
   })
-  it('rejects missing or foreign Origin, missing cookie, and mismatched CSRF/browser binding', async () => {
+  it('approves with absent or null Origin when CSRF, cookie nonce, and owner key are valid', async () => {
+    for (const originHeader of [undefined, 'null']) {
+      const pending = await approval()
+      const headers: Record<string, string> = { cookie: pending.cookie }
+      if (originHeader !== undefined) headers.origin = originHeader
+      const response = await form(
+        '/authorize',
+        {
+          request_id: pending.requestId,
+          csrf_token: pending.csrf,
+          owner_key: ownerKey,
+          decision: 'approve',
+        },
+        headers,
+      )
+      expect(response.status).toBe(302)
+      const location = new URL(response.headers.get('location') ?? '')
+      expect(location.searchParams.get('state')).toBe('synthetic-state')
+      const value = location.searchParams.get('code')
+      expect(value).toMatch(/^[A-Za-z0-9_-]{43}$/)
+      expect((await exchange(value as string)).status).toBe(200)
+    }
+  })
+  it('rejects a foreign Origin even when CSRF, cookie nonce, and owner key are valid', async () => {
+    const pending = await approval()
+    const response = await decide(pending, {}, { origin: 'https://evil.com' })
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ error: 'access_denied' })
+    expect(response.headers.get('location')).toBeNull()
+    // Rejection must not consume an otherwise valid approval request.
+    expect((await decide(pending)).status).toBe(302)
+  })
+  it('rejects empty or foreign Origin, missing cookie, and mismatched CSRF/browser binding', async () => {
     const pending = await approval()
     for (const headers of [
       { origin: '' },
