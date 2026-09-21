@@ -134,7 +134,7 @@ export function registerOAuth(
       })
       res.setHeader(
         'Content-Security-Policy',
-        `default-src 'none'; form-action ${config.issuer}; frame-ancestors 'none'; base-uri 'none'`,
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
       )
       res.setHeader('X-Frame-Options', 'DENY')
       res

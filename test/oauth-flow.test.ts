@@ -260,11 +260,11 @@ describe('approval, discovery and PKCE over isolated Express HTTP', () => {
     expect(pending.html).not.toContain(ownerKey)
     expect((await db.execute('SELECT * FROM mcp_oauth_codes')).rows).toHaveLength(0)
   })
-  it('sets the approval form-action to the exact configured origin instead of self', async () => {
+  it('sets the approval CSP without a form-action directive', async () => {
     const pending = await approval()
     expect(pending.response.status).toBe(200)
     expect(pending.response.headers.get('content-security-policy')).toBe(
-      "default-src 'none'; form-action https://mcp.example.invalid; frame-ancestors 'none'; base-uri 'none'",
+      "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
     )
   })
   it.each([
