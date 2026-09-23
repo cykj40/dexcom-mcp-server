@@ -1,200 +1,246 @@
 # Dexcom MCP Server
 
-A Model Context Protocol (MCP) server that connects Claude to your personal Dexcom CGM (Continuous Glucose Monitor) for assistive diabetes management intelligence.
+MCP (Model Context Protocol) server that connects an MCP host (such as Claude Desktop) to personal Dexcom CGM data for **human-in-the-loop** glucose analysis, event logging, and modeling. The host can analyze and recommend; you decide and act. This project does not automate insulin delivery or change pump settings.
 
-## 🎯 Prime Directive
+## Features
 
-This is a **human-in-the-loop assistive intelligence system**:
+- **Glucose tools** — latest reading, ranges, daily summaries, and statistics
+- **Trend analysis** — patterns over days/weeks, expected vs actual, parameter-drift signals
+- **Event logging** — insulin, carbs, and exercise, plus timeline / per-type retrieval
+- **Charts** — timeline, daily, weekly, and AGP-style visualizations
+- **Modeling** — baseline ISF/ICR/basal parameters, impact predictions, adaptive insights
+- **Transports** — `stdio` (local MCP hosts) or `http` (remote connector with OAuth 2.1 + PKCE)
 
-- ✅ Claude analyzes, reasons, and recommends
-- ✅ User decides and acts
-- ❌ No automation, no control, no silent changes
+## Requirements
 
-## 🚀 Features
+- Node.js 18+ (Docker image uses Node 20)
+- Dexcom Developer API credentials ([developer.dexcom.com](https://developer.dexcom.com/))
+- A Dexcom CGM account with data available via the Developer API
+- A [Turso](https://turso.tech/) database (OAuth tokens and persisted readings/events)
 
-- **Real-time CGM Data**: Fetch current and historical glucose readings
-- **Trend Analysis**: Analyze patterns, post-meal spikes, and overnight stability
-- **Event Logging**: Track insulin doses, carbohydrate intake, and exercise
-- **Adaptive Modeling**: Learn how your metabolism behaves over time
-- **Predictive Intelligence**: Estimate glucose impact of insulin and carbs
-- **Visualizations**: Generate charts and AGP (Ambulatory Glucose Profile)
-- **Parameter Drift Detection**: Identify when your insulin sensitivity changes
+Optional: Dexcom Share username/password as a best-effort fallback when the Developer API path fails.
 
-## 📋 Prerequisites
+## Quick start (local / stdio)
 
-- Node.js 18+
-- Dexcom Developer API credentials ([apply here](https://developer.dexcom.com/))
-- A Dexcom CGM device actively transmitting data
-- A Turso database for persistent glucose, event, model, and OAuth token storage
-
-## 🔧 Installation
-
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/cykj40/dexcom-mcp-server.git
-   cd dexcom-mcp-server
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Configure environment variables:
-   ```bash
-   cp .env.example .env
-   ```
-
-   Edit `.env` and fill in your credentials:
-   - `DEXCOM_CLIENT_ID` - From Dexcom Developer Portal
-   - `DEXCOM_CLIENT_SECRET` - From Dexcom Developer Portal
-   - `DEXCOM_REDIRECT_URI` - OAuth redirect URI
-   - `TURSO_DATABASE_URL` - Turso database URL for token and glucose persistence
-   - `DEXCOM_ACCESS_TOKEN` / `DEXCOM_REFRESH_TOKEN` - Optional one-time bootstrap only when Turso has no tokens
-
-4. Build the project:
-   ```bash
-   npm run build
-   ```
-
-## 🎮 Usage
-
-### Running the Server Directly
+### 1. Clone and install
 
 ```bash
+git clone https://github.com/cykj40/dexcom-mcp-server.git
+cd dexcom-mcp-server
+npm install
+```
+
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Set at least:
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `DEXCOM_CLIENT_ID` | Yes | Dexcom OAuth client ID |
+| `DEXCOM_CLIENT_SECRET` | Yes | Dexcom OAuth client secret |
+| `DEXCOM_REDIRECT_URI` | Yes | Must match the app redirect (e.g. `http://localhost:3000/callback`) |
+| `TURSO_DATABASE_URL` | Yes | Turso `libsql://…` URL |
+| `TURSO_AUTH_TOKEN` | Yes | Turso auth token |
+| `DEXCOM_API_ENV` | No | `production` (default) or `sandbox` |
+| `TRANSPORT` | No | `stdio` (default, recommended for local) or `http` |
+| `SERVER_TIMEZONE` | No | IANA timezone for daily buckets (default UTC) |
+
+Optional (stdio / bootstrap):
+
+| Variable | Purpose |
+|----------|---------|
+| `DEXCOM_ACCESS_TOKEN` / `DEXCOM_REFRESH_TOKEN` | One-time bootstrap only if Turso has no tokens yet |
+| `DEXCOM_SHARE_USERNAME` / `DEXCOM_SHARE_PASSWORD` | Share API fallback |
+
+When `TRANSPORT=http`, also set:
+
+| Variable | Purpose |
+|----------|---------|
+| `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` | MCP connector client credentials |
+| `OAUTH_ALLOWED_REDIRECT_URIS` | Exact callback URLs, comma-separated |
+| `OAUTH_ISSUER_URL` | Canonical HTTPS origin (no trailing slash) |
+| `OAUTH_OWNER_APPROVAL_KEY_SHA256` | SHA-256 hex digest of your owner approval key |
+| `MCP_AUTH_TOKEN` | Legacy bearer accepted at `/mcp` only until a fixed cutoff (see `.env.example`); prefer OAuth grants |
+| `PORT` | Listen port (default `3000`) |
+
+Do not commit `.env` or any database files.
+
+### 3. Dexcom OAuth (one-time)
+
+```bash
+npm run oauth
+```
+
+Complete the browser flow so tokens land in Turso (or use the optional bootstrap env vars once). Manual flow: `npm run oauth:manual`.
+
+### 4. Build and run
+
+```bash
+npm run build
 npm start
 ```
 
-### Integrating with Claude Desktop
+Development:
 
-Add to your `claude_desktop_config.json`:
+```bash
+npm run dev
+```
+
+### 5. Claude Desktop (stdio)
+
+Example `claude_desktop_config.json` (use absolute paths and your own secrets):
 
 ```json
 {
   "mcpServers": {
     "dexcom": {
       "command": "node",
-      "args": ["/absolute/path/to/dexcom-mcp-server/dist/index.js"],
+      "args": ["/ABSOLUTE/PATH/TO/dexcom-mcp-server/dist/index.js"],
       "env": {
+        "TRANSPORT": "stdio",
         "DEXCOM_CLIENT_ID": "your_client_id",
         "DEXCOM_CLIENT_SECRET": "your_client_secret",
-        "DEXCOM_REDIRECT_URI": "your_redirect_uri",
+        "DEXCOM_REDIRECT_URI": "http://localhost:3000/callback",
         "TURSO_DATABASE_URL": "libsql://your-db.turso.io",
-        "TURSO_AUTH_TOKEN": "your_turso_auth_token"
+        "TURSO_AUTH_TOKEN": "your_turso_auth_token",
+        "DEXCOM_API_ENV": "production"
       }
     }
   }
 }
 ```
 
-Restart Claude Desktop, and you'll have access to all Dexcom tools.
+Restart Claude Desktop after saving.
 
-## 🛠️ Available Tools
+## HTTP transport (optional / remote)
 
-### Glucose Reading Tools
-- `get_latest_glucose` - Get current glucose with trend
-- `get_glucose_range` - Get readings within a time range
-- `get_daily_summary` - Daily glucose statistics
-- `get_glucose_statistics` - Comprehensive stats for any period
+With `TRANSPORT=http`, the server exposes:
 
-### Analysis Tools
-- `analyze_trends` - Analyze patterns over days/weeks
-- `compare_expected_vs_actual` - Compare predictions to reality
-- `detect_parameter_drift` - Identify if ISF/ICR has changed
+- `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource`
+- `/authorize` and `/token` (OAuth 2.1 authorization code + PKCE S256, owner-key approval)
+- Authenticated `/mcp`
+- Public `/health`
 
-### Event Logging Tools
-- `log_insulin` - Log insulin dose
-- `log_carbs` - Log carbohydrate intake
-- `log_exercise` - Log physical activity
-- `get_event_timeline` - View all events with glucose context
-- `get_insulin_events` - Get insulin events within a time range
-- `get_carb_events` - Get carbohydrate events within a time range
-- `get_exercise_events` - Get exercise events within a time range
+Operator CLI (after build): `node dist/auth/admin.js list` and `node dist/auth/admin.js revoke <grant-id>`.
 
-### Chart Tools
-- `generate_chart` - Create visualizations (timeline, daily, weekly, AGP)
+Prefer stdio for local use. Treat HTTP mode as a high-sensitivity deployment: strong secrets, exact redirect allowlists, HTTPS issuer URL, and private hosting.
 
-### Modeling Tools
-- `get_baseline_parameters` - View your ISF, ICR, and basal dose
-- `update_baseline_parameters` - Update baseline parameters after explicit confirmation
-- `predict_glucose_impact` - Predict effect of insulin or carbs
-- `get_adaptive_insights` - See how predictions compare to reality
+Optional deploy config lives in `fly.toml` (Fly.io). Do not publish live app URLs or secrets in docs.
 
-## 📊 Database
+## Available MCP tools
 
-Persistent data is stored in the configured Turso/libSQL database:
+### Glucose
+- `get_latest_glucose`
+- `get_glucose_range`
+- `get_daily_summary`
+- `get_glucose_statistics`
 
-- Glucose readings (from Dexcom API and Share API)
-- Insulin, carb, and exercise events
-- Adaptive observations (expected vs actual outcomes)
-- Baseline modeling parameters
-- Dexcom OAuth access and refresh tokens
+### Analysis
+- `analyze_trends`
+- `compare_expected_vs_actual`
+- `detect_parameter_drift`
 
-Turso is a third-party managed database service, so this data does not remain solely on
-the machine running the server. Requested tool results are also returned to the connected
-MCP client, such as Claude. Protect the Turso and MCP credentials accordingly.
+### Events
+- `log_insulin`, `log_carbs`, `log_exercise`
+- `get_event_timeline`
+- `get_insulin_events`, `get_carb_events`, `get_exercise_events`
 
-## 🔒 Security
+### Charts
+- `generate_chart`
 
-- **Environment variables only**: Never hardcode credentials
-- **Remote persistence**: Sensitive health data and Dexcom OAuth tokens are stored in Turso
-- **OAuth 2.0**: Uses official Dexcom Developer API
-- **Read-only device access**: Cannot modify pump settings
+### Modeling
+- `get_baseline_parameters`
+- `update_baseline_parameters` (requires explicit confirmation in the tool args; treat as sensitive)
+- `predict_glucose_impact`
+- `get_adaptive_insights`
 
-## 🏥 Medical Disclaimer
+## Example prompts (generic)
 
-**This is an assistive tool, not medical advice.**
-
-- All recommendations are based on your personal data
-- You are the final authority on all diabetes management decisions
-- Never rely solely on this tool for treatment decisions
-- Consult your healthcare provider before changing insulin doses
-- This is not FDA-approved medical software
-
-## 🧪 Development
-
-### Run in Development Mode
-
-```bash
-npm run dev
+```
+What's my latest glucose and trend?
 ```
 
-### Build
-
-```bash
-npm run build
+```
+Summarize yesterday's glucose statistics.
 ```
 
-### Project Structure
+```
+Log 5 units of rapid insulin for lunch and 45g carbs.
+```
+
+```
+Show an event timeline for the last 24 hours.
+```
+
+```
+Predict the glucose impact of 40g of carbs with my current baseline.
+```
+
+## Data storage
+
+Runtime persistence uses **Turso** (`TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN`): OAuth tokens, glucose readings, events, and related records. This is a third-party hosted database you control via your Turso account.
+
+Do not commit database files; keep `data/` and `*.db*` gitignored. Prefer keeping the repository private while it holds health-data tooling.
+
+## Security notes
+
+- Keep credentials in environment variables or a secret store — never in source.
+- Prefer `TRANSPORT=stdio` for local use.
+- HTTP mode uses OAuth 2.1 + PKCE with owner approval and hashed tokens. Rotate any legacy `MCP_AUTH_TOKEN` if it may have been exposed, and prefer OAuth grants.
+- This server is assistive and must not be treated as a closed-loop controller.
+- Review git history before making the repo public: do not leave historical database blobs or secrets reachable.
+
+## npm scripts
+
+| Script | Purpose |
+|--------|---------|
+| `npm run build` | Compile TypeScript to `dist/` |
+| `npm start` | Run compiled server |
+| `npm run dev` | Dev watch mode |
+| `npm run oauth` | Dexcom OAuth helper |
+| `npm run oauth:manual` | Manual code exchange helper |
+| `npm test` / `npm run test:watch` | Vitest |
+| `npm run lint` / `npm run lint:fix` | Biome |
+| `npm run format` | Format with Biome |
+
+## Project structure
 
 ```
 dexcom-mcp-server/
 ├── src/
-│   ├── config/         # Environment validation
-│   ├── db/             # Turso/libSQL database layer
-│   ├── services/       # Business logic
-│   ├── tools/          # MCP tool definitions
-│   ├── types/          # TypeScript types
-│   └── index.ts        # Server entrypoint
-└── dist/               # Compiled JavaScript
+│   ├── auth/         # HTTP OAuth, crypto helpers, grant admin CLI
+│   ├── config/       # Env validation
+│   ├── db/           # Turso client, migrations, queries, token store
+│   ├── services/     # Dexcom API/Share, glucose, events, modeling, charts
+│   ├── tools/        # MCP tool registration
+│   ├── types/        # Shared types
+│   ├── utils/
+│   ├── oauth-helper.ts
+│   ├── manual-oauth.ts
+│   └── index.ts      # Entrypoint (stdio / http)
+├── test/             # Vitest tests and fixtures
+├── .env.example
+├── fly.toml          # Optional Fly.io deploy config
+└── package.json
 ```
 
-## 📝 License
+## Known limitations / missing information
 
-MIT License - See LICENSE file for details
+- Share API path is undocumented / best-effort and may be unreliable
+- Baseline updates currently rely on a caller-supplied confirmation flag — treat compromised clients carefully
+- Schema may seed placeholder physiology defaults on empty DB; bootstrap intentionally for real use
+- No CI workflows documented in this README
+- Health data is sensitive — protect the repo, secrets, remote endpoint, and any clones
 
-## 🤝 Contributing
+## Medical disclaimer
 
-This is a personal diabetes management tool. If you'd like to adapt it for your own use:
+**Assistive tool only — not medical advice and not FDA-approved medical software.**  
+You are responsible for all treatment decisions. Consult your clinician before changing insulin or other therapy. Never rely solely on this tool for dosing.
 
-1. Update baseline parameters in `src/types/index.ts`
-2. Adjust target ranges if needed
-3. Modify modeling algorithms to match your physiology
+## License
 
-## 📧 Support
-
-For issues or questions, please open a GitHub issue.
-
----
-
-**Remember**: This tool learns from your patterns but never acts autonomously. You decide, you act, you control.
+MIT — see [`LICENSE`](LICENSE).
